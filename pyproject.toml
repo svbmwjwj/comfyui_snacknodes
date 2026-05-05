@@ -1,0 +1,28 @@
+# pyproject.toml
+[build-system]
+requires = ["setuptools>=65.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfyui_snacknodes"
+description = "A comprehensive collection of ComfyUI nodes designed to reduce reliance on multiple third-party node packages."
+version = "1.0.0"
+authors = [
+    {name = "svbmwjwj", email = "255624542+svbmwjwj@users.noreply.github.com"}
+]
+readme = "README.md"
+license = {text = "GNU General Public License v3"}
+dependencies = [
+    "torch",
+    "numpy",
+    "pillow",
+    "opencv-python-headless"
+]
+
+[project.urls]
+Repository = "https://github.com/svbmwjwj/comfyui_snacknodes"
+
+[tool.comfy]
+PublisherId = "svbmwjwj"
+DisplayName = "comfyui_snacknodes"
+Icon = "https://raw.githubusercontent.com/svbmwjwj/comfyui_snacknodes/main/web/icon.png"
