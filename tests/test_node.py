@@ -14,6 +14,12 @@ from cloud_drive.vault import CryptomatorVault
 from local_provider import LocalProvider
 
 
+def _upload(mod, provider, encryption, remote_folder, filename_prefix, **kw):
+    return mod.SaveToCloudDrive().save_and_upload(provider=provider, encryption=encryption,
+                                                  remote_folder=remote_folder, filename_prefix=filename_prefix,
+                                                  keep_local_copy=True, **kw)
+
+
 class FakeTensor:
     def __init__(self, arr):
         self.arr = arr
@@ -71,7 +77,7 @@ def test_registration():
 def test_plain_upload(node_module):
     mod, out, drive, _ = node_module
     images = FakeTensor(np.random.rand(2, 8, 8, 3).astype(np.float32))
-    res = mod.SaveToCloudDrive().save_and_upload("Google Drive", "none", "ComfyUI/x", "pic", True, images=images)
+    res = _upload(mod, "Google Drive", "none", "ComfyUI/x", "pic", images=images)
     lines = res["result"][0].splitlines()
     assert lines == ["local:ComfyUI/x/pic_00001_.png", "local:ComfyUI/x/pic_00002_.png"]
     assert (drive / "ComfyUI" / "x" / "pic_00001_.png").read_bytes() == (out / "pic_00001_.png").read_bytes()
@@ -84,7 +90,7 @@ def test_encrypted_upload(node_module, tmp_path):
     store = CredentialStore()
     store.update("vault:local", {"path": "Vault", **vault.keys.to_dict()})
     images = FakeTensor(np.random.rand(1, 8, 8, 3).astype(np.float32))
-    res = mod.SaveToCloudDrive().save_and_upload("Google Drive", "Cryptomator vault", "ComfyUI", "pic", True,
+    res = _upload(mod, "Google Drive", "Cryptomator vault", "ComfyUI", "pic",
                                                  images=images)
     assert res["result"][0] == "local:Vault/ComfyUI/pic_00001_.png [encrypted]"
     assert not (drive / "ComfyUI").exists()
@@ -100,18 +106,18 @@ def test_file_paths_outside_comfy_dirs_are_refused(node_module, tmp_path):
     secret = tmp_path / "secret.txt"
     secret.write_text("x")
     with pytest.raises(ValueError, match="Refusing"):
-        mod.SaveToCloudDrive().save_and_upload("Google Drive", "none", "a", "p", True, file_paths=str(secret))
+        _upload(mod, "Google Drive", "none", "a", "p", file_paths=str(secret))
     with pytest.raises(ValueError, match="Refusing"):
-        mod.SaveToCloudDrive().save_and_upload("Google Drive", "none", "a", "p", True, file_paths="../secret.txt")
+        _upload(mod, "Google Drive", "none", "a", "p", file_paths="../secret.txt")
     (out / "ok.txt").write_text("fine")
-    res = mod.SaveToCloudDrive().save_and_upload("Google Drive", "none", "a", "p", True, file_paths="ok.txt")
+    res = _upload(mod, "Google Drive", "none", "a", "p", file_paths="ok.txt")
     assert res["result"][0] == "local:a/ok.txt"
 
 
 def test_nothing_to_upload(node_module):
     mod = node_module[0]
     with pytest.raises(ValueError, match="Nothing to upload"):
-        mod.SaveToCloudDrive().save_and_upload("Google Drive", "none", "a", "p", True)
+        _upload(mod, "Google Drive", "none", "a", "p")
 
 
 def test_expand_date_tokens(node_module):
@@ -128,8 +134,43 @@ def test_remote_folder_date_tokens(node_module):
     from datetime import datetime
     mod, _, drive, _ = node_module
     images = FakeTensor(np.random.rand(1, 8, 8, 3).astype(np.float32))
-    res = mod.SaveToCloudDrive().save_and_upload("Google Drive", "none", "ComfyUI/%date:yyyy-MM%", "pic", True,
+    res = _upload(mod, "Google Drive", "none", "ComfyUI/%date:yyyy-MM%", "pic",
                                                  images=images)
     month = datetime.now().strftime("%Y-%m")
     assert res["result"][0] == f"local:ComfyUI/{month}/pic_00001_.png"
     assert (drive / "ComfyUI" / month / "pic_00001_.png").exists()
+
+
+def test_preview_switch(node_module):
+    mod = node_module[0]
+    images = FakeTensor(np.random.rand(1, 8, 8, 3).astype(np.float32))
+    on = mod.SaveToCloudDrive().save_and_upload(provider="Google Drive", remote_folder="p", encryption="none",
+                                                preview=True, filename_prefix="on", images=images)
+    off = mod.SaveToCloudDrive().save_and_upload(provider="Google Drive", remote_folder="p", encryption="none",
+                                                 preview=False, filename_prefix="off", images=images)
+    assert len(on["ui"]["images"]) == 1 and "images" not in off["ui"]
+    assert off["ui"]["text"] == ["local:p/off_00001_.png"]
+
+
+def test_layout_and_defaults(node_module):
+    mod = node_module[0]
+    spec = mod.SaveToCloudDrive.INPUT_TYPES()
+    assert list(spec["required"]) == ["provider", "remote_folder", "encryption", "preview",
+                                      "filename_prefix", "keep_local_copy"]
+    assert spec["required"]["remote_folder"][1]["default"] == "ComfyUI/%date:yyyy-MM-dd%"
+    advanced = [k for part in ("required", "optional") for k, v in spec[part].items() if v[1].get("advanced")]
+    assert advanced == ["filename_prefix", "keep_local_copy", "file_paths"]
+
+
+def test_locales_cover_every_input(node_module):
+    import json
+    mod = node_module[0]
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    spec = mod.SaveToCloudDrive.INPUT_TYPES()
+    names = set(spec["required"]) | set(spec["optional"])
+    for lang in ("en", "zh"):
+        with open(os.path.join(root, "locales", lang, "nodeDefs.json"), encoding="utf-8") as f:
+            node = json.load(f)["SnackSaveToCloudDrive"]
+        assert set(node["inputs"]) == names, lang
+        assert all(v["name"] and v["tooltip"] for v in node["inputs"].values()), lang
+        assert node["display_name"] and node["description"] and node["outputs"]["0"]["name"], lang

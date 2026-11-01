@@ -10,4 +10,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "SnackSaveToCloudDrive": "Save to Cloud Drive",
 }
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+# Frontend extension (shows the upload result on the node) and locales/ live next to this file.
+WEB_DIRECTORY = "./web"
+
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

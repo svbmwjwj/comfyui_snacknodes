@@ -82,51 +82,80 @@ class SaveToCloudDrive:
     RETURN_NAMES = ("remote_paths",)
     OUTPUT_TOOLTIPS = ("One line per uploaded file: a share link when the drive provides one, "
                        "otherwise provider:path.",)
-    DESCRIPTION = ("Uploads images, a video, or existing output files to your own cloud drive, optionally "
-                   "end-to-end encrypted (Cryptomator vault). Authorize once with auth.py; credentials and "
-                   "keys are never stored in the workflow.")
+    # English texts live here; other languages in locales/<lang>/nodeDefs.json.
+    DESCRIPTION = """Upload images, a video or existing files to your own cloud drive, optionally end-to-end encrypted.
+
+One-time setup (in a terminal on the ComfyUI machine):
+  python custom_nodes/comfyui_snacknodes/auth.py google_drive
+  python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER
+  python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   (only for encryption)
+Credentials are stored on that machine, never in the workflow.
+
+Usage
+- Connect images and/or video; pick the drive.
+- remote_folder: folder on the drive, created if missing. Date tokens:
+  ComfyUI/%date:yyyy-MM-dd%  ->  ComfyUI/2026-11-01
+  ComfyUI/%year%/%month%     ->  ComfyUI/2026/11
+- encryption = Cryptomator vault: file contents and names are encrypted before upload;
+  open them with the Cryptomator app.
+- preview: show the images on the node after the run.
+- Advanced: filename_prefix and keep_local_copy control the local copy.
+- file_paths (input): connect a text node listing files that already exist in the output
+  folder, one per line, e.g. video/ComfyUI_00001_.mp4
+Existing files are never overwritten (name_1, name_2 ...)."""
     SEARCH_ALIASES = ["upload", "google drive", "aliyun", "alipan", "cloud", "export", "backup",
-                      "encrypt", "cryptomator", "webdav", "nutstore", "jianguoyun", "nextcloud"]
+                      "encrypt", "cryptomator", "webdav", "nutstore", "jianguoyun", "nextcloud",
+                      "上传", "网盘", "云盘", "备份", "加密", "坚果云"]
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "provider": (list(PROVIDER_LABELS), {"tooltip": "Which cloud drive to upload to."}),
-                "encryption": (ENCRYPTION_OPTIONS, {
-                    "default": "none",
-                    "tooltip": "Cryptomator vault: file contents and names are encrypted before upload; "
-                               "open them with the Cryptomator app. Set up the vault once with auth.py.",
+                "provider": (list(PROVIDER_LABELS), {
+                    "tooltip": "Which cloud drive to upload to. Authorize it once with auth.py.",
                 }),
                 "remote_folder": ("STRING", {
-                    "default": "ComfyUI",
-                    "tooltip": "Folder on the drive (or inside the vault when encrypting), e.g. "
-                               "ComfyUI/portraits or ComfyUI/%date:yyyy-MM%. Created if missing. Date tokens: "
-                               "%date:yyyy-MM-dd%, %year%, %month%, %day%, %hour%, %minute%, %second% "
-                               "(server local time).",
+                    "default": "ComfyUI/%date:yyyy-MM-dd%",
+                    "tooltip": "Folder on the drive (inside the vault when encrypting); created if missing. "
+                               "Date tokens: %date:yyyy-MM-dd%, %year%, %month%, %day%, %hour%, %minute%, "
+                               "%second% (server local time). Example: ComfyUI/%date:yyyy-MM%",
+                }),
+                "encryption": (ENCRYPTION_OPTIONS, {
+                    "default": "none",
+                    "tooltip": "Cryptomator vault: file contents and names are encrypted before upload; open "
+                               "them with the Cryptomator app. Create the vault once with auth.py vault-create.",
+                }),
+                "preview": ("BOOLEAN", {
+                    "default": True, "label_on": "开 on", "label_off": "关 off",
+                    "tooltip": "Show the saved images on the node after the run.",
                 }),
                 "filename_prefix": ("STRING", {
-                    "default": "ComfyUI",
-                    "tooltip": "Prefix for saved images/videos. Supports the same tokens as Save Image.",
+                    "default": "ComfyUI", "advanced": True,
+                    "tooltip": "Name prefix for saved images/videos, same as Save Image. A sub folder is "
+                               "allowed, e.g. portraits/ComfyUI",
                 }),
                 "keep_local_copy": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Keep images/videos in the output folder. Off: use the temp folder.",
+                    "default": True, "advanced": True, "label_on": "开 on", "label_off": "关 off",
+                    "tooltip": "On: also keep the files in ComfyUI's output folder. Off: use the temp folder "
+                               "(cleared when ComfyUI restarts).",
                 }),
             },
             "optional": {
                 "images": ("IMAGE", {"tooltip": "Images to save as PNG and upload."}),
                 "video": ("VIDEO", {"tooltip": "Video to save as MP4 and upload."}),
                 "file_paths": ("STRING", {
-                    "multiline": True, "default": "",
-                    "tooltip": "Existing files to upload, one per line, relative to the output folder.",
+                    # A socket, not a text box: most people never need it, and a multiline box is big.
+                    "forceInput": True, "advanced": True,
+                    "tooltip": "Optional: connect a text node listing existing files to upload, one per line, "
+                               "relative to ComfyUI's output folder, e.g. video/ComfyUI_00001_.mp4",
                 }),
             },
             "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
         }
 
-    def save_and_upload(self, provider, encryption, remote_folder, filename_prefix, keep_local_copy,
-                        images=None, video=None, file_paths="", prompt=None, extra_pnginfo=None):
+    def save_and_upload(self, provider, remote_folder, encryption, preview=True, filename_prefix="ComfyUI",
+                        keep_local_copy=True, images=None, video=None, file_paths="", prompt=None,
+                        extra_pnginfo=None):
         provider_name = PROVIDER_LABELS.get(provider, provider)
         if provider_name not in PROVIDERS:
             raise ValueError(f"Unknown provider: {provider}")
@@ -170,7 +199,10 @@ class SaveToCloudDrive:
             results.append(result.describe())
 
         text = "\n".join(results)
-        return {"ui": {"images": ui_images, "text": [text]}, "result": (text,)}
+        ui = {"text": [text]}
+        if preview and ui_images:
+            ui["images"] = ui_images
+        return {"ui": ui, "result": (text,)}
 
     @staticmethod
     def _save_images(images, filename_prefix, out_dir, save_type, prompt, extra_pnginfo):

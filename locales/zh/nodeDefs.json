@@ -1,0 +1,50 @@
+{
+  "SnackSaveToCloudDrive": {
+    "display_name": "保存到网盘 (Save to Cloud Drive)",
+    "description": "把图片、视频或已有文件上传到你自己的网盘，可选端到端加密。\n\n一次性设置（在运行 ComfyUI 的机器的终端里执行）：\n  python custom_nodes/comfyui_snacknodes/auth.py google_drive\n  python custom_nodes/comfyui_snacknodes/auth.py webdav --url 地址 --username 用户名\n  python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   （仅加密时需要）\n凭据只保存在这台机器上，不会写进工作流。\n\n用法\n- 连上 图像 和/或 视频，选择网盘。\n- 网盘目录：不存在会自动创建，支持日期变量：\n  ComfyUI/%date:yyyy-MM-dd%  →  ComfyUI/2026-11-01\n  ComfyUI/%year%/%month%     →  ComfyUI/2026/11\n- 加密选 Cryptomator vault：文件内容和文件名在上传前就加密，用 Cryptomator App 打开。\n- 预览：运行后在节点上显示图片，不需要可以关掉。\n- 高级选项：文件名前缀、保留本地副本 控制本机保存的副本。\n- 额外上传文件（输入接口）：连一个文本节点，列出 output 目录里已有的文件，一行一个，例如 video/ComfyUI_00001_.mp4\n网盘上的同名文件不会被覆盖，会自动改名为 名字_1、名字_2……",
+    "inputs": {
+      "provider": {
+        "name": "网盘",
+        "tooltip": "上传到哪个网盘。第一次使用前先用 auth.py 授权。"
+      },
+      "remote_folder": {
+        "name": "网盘目录",
+        "tooltip": "网盘上的目录（开启加密时是保险库里的目录），不存在会自动创建。支持日期变量：%date:yyyy-MM-dd%、%year%、%month%、%day%、%hour%、%minute%、%second%（服务器本地时间）。例如 ComfyUI/%date:yyyy-MM%"
+      },
+      "encryption": {
+        "name": "加密",
+        "tooltip": "选 Cryptomator vault 时，文件内容和文件名在上传前就加密，用 Cryptomator App 打开。保险库用 auth.py vault-create 创建一次即可。"
+      },
+      "preview": {
+        "name": "预览",
+        "tooltip": "运行后在节点上显示保存的图片。"
+      },
+      "filename_prefix": {
+        "name": "文件名前缀",
+        "tooltip": "保存的图片/视频的文件名前缀，和 Save Image 节点一样，可以带子目录，例如 portraits/ComfyUI"
+      },
+      "keep_local_copy": {
+        "name": "保留本地副本",
+        "tooltip": "开：文件同时保留在 ComfyUI 的 output 目录。关：只放在临时目录（ComfyUI 重启后清空）。"
+      },
+      "images": {
+        "name": "图像",
+        "tooltip": "要保存为 PNG 并上传的图片。"
+      },
+      "video": {
+        "name": "视频",
+        "tooltip": "要保存为 MP4 并上传的视频。"
+      },
+      "file_paths": {
+        "name": "额外上传文件",
+        "tooltip": "可选：连一个文本节点，列出要上传的已有文件，一行一个，路径相对于 ComfyUI 的 output 目录，例如 video/ComfyUI_00001_.mp4"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "上传结果",
+        "tooltip": "每个文件一行：网盘提供分享链接时是链接，否则是 网盘:路径。"
+      }
+    }
+  }
+}

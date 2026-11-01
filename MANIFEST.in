@@ -3,7 +3,8 @@ include README.md
 include pyproject.toml
 include requirements.txt
 include auth.py
-include web/icon.png
+recursive-include web *.png *.js
+recursive-include locales *.json
 
 recursive-include cloud_drive *.py
 recursive-include nodes *.py
