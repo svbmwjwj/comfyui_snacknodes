@@ -1,15 +1,137 @@
 # SnackNodes 🍿
 
-> **All nodes in this pack have been retired.** ComfyUI core now ships equivalent nodes.
-> Loading an old workflow will show these nodes as missing — replace them as below.
+**Save to Cloud Drive**：把 ComfyUI 生成的图片、视频或文件直接上传到你自己的 **Google Drive** 或 **阿里云盘**。可选**端到端加密**，加密格式与 [Cryptomator](https://cryptomator.org) 保险库完全兼容，网盘服务商看不到文件内容和文件名。
 
-| Retired node | Core replacement |
+适合在 AutoDL 等租卡平台、或任何远程 GPU 服务器上运行 ComfyUI 的个人用户。
+
+## 功能
+
+- 接收 `images`、`video`，或 output 目录中已有文件的路径（`file_paths`，一行一个）
+- 可选在本地保留一份副本，也可以只用临时目录
+- 远程文件夹不存在时会自动创建，例如 `ComfyUI/2026-11`
+- 输出上传结果：Google Drive 返回分享链接；阿里云盘和加密文件返回 `provider:路径`
+- 凭据和密钥**不会写进工作流**，分享工作流不会泄露账号
+- 分片上传，网络错误或限流时自动重试；Google Drive 支持断点续传
+- 网络代理：遵循标准的 `HTTPS_PROXY` 环境变量，网络问题需要用户自行解决
+
+## 安装
+
+放进 `ComfyUI/custom_nodes/comfyui_snacknodes`，然后安装依赖：
+
+```bash
+pip install -r custom_nodes/comfyui_snacknodes/requirements.txt
+```
+
+依赖只有 `requests` 和 `cryptography`。
+
+## 一次性授权
+
+以下命令都在**运行 ComfyUI 的那台机器**上执行（比如 AutoDL 的终端），在 ComfyUI 根目录下运行。
+
+### Google Drive
+
+1. 打开 [Google Cloud Console](https://console.cloud.google.com/)，新建一个项目，并启用 **Google Drive API**。
+2. 配置 **OAuth 同意屏幕**：用户类型选"外部"，然后把发布状态改为 **"正式版（In production）"**。
+   - 本工具只申请 `drive.file` 权限，属于非敏感权限，发布不需要经过 Google 审核。
+   - 如果停留在"测试"状态，refresh token 每 7 天就会失效。
+3. 在"凭据"页面创建 OAuth 客户端 ID，应用类型选 **"电视和受限输入设备"（TVs and Limited Input devices）**。
+4. 运行下面的命令，按提示在手机或电脑上打开网址并输入验证码：
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py google_drive --client-id 你的ID --client-secret 你的Secret
+```
+
+`drive.file` 权限意味着本工具**只能看到它自己创建的文件和文件夹**，读不到你 Drive 里的其他任何内容。
+
+### 阿里云盘
+
+1. 在[阿里云盘开放平台](https://www.alipan.com/developer)注册开发者并创建应用，记下 `client_id` 和 `client_secret`。
+2. 运行下面的命令，打开它输出的二维码链接，用阿里云盘 App 扫码确认：
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID --client-secret 你的Secret
+```
+
+如果扫码授权失败，可以加上 `--refresh-token 你的token`，直接导入一个已有的 refresh token。
+
+默认上传到"资源库"。如果想传到"备份盘"，在凭据文件的 `aliyundrive` 项中加上 `"drive": "backup"`。
+
+### 查看状态和退出登录
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py status
+```
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py logout google_drive
+```
+
+凭据保存在 `~/.config/comfyui_snacknodes/cloud_drive.json`，文件权限为 600。可以用 `SNACKNODES_CONFIG_DIR` 环境变量修改位置。
+也可以不用凭据文件，改用环境变量：`SNACK_GDRIVE_CLIENT_ID` / `SNACK_GDRIVE_CLIENT_SECRET` / `SNACK_GDRIVE_REFRESH_TOKEN`，阿里云盘对应 `SNACK_ALIYUNDRIVE_*`。
+
+## 端到端加密（Cryptomator 保险库）
+
+在节点上把 `encryption` 设为 **Cryptomator vault** 后，文件会**先在本机加密，再上传**：
+
+- **文件内容**：AES-256-GCM，每 32 KiB 一个分块，每块都有完整性校验，被篡改或损坏会被发现
+- **文件名和文件夹名**：AES-SIV 加密，网盘上只能看到 `d/XX/YYYY…/xxxx.c9r` 这样的乱码
+- **密码**：经过 scrypt 派生密钥，用来包裹主密钥
+
+这就是 Cryptomator 的保险库格式（vault format 8），所以你可以用 **Cryptomator 官方客户端（桌面端、iOS、Android）** 直接打开、浏览和解密，不依赖本工具。
+兼容性已经用 Cryptomator 官方的 Java 库 `cryptofs` 双向验证过，CI 每次都会重跑这项测试：本工具写的保险库，官方能逐字节正确解密；官方创建的保险库，本工具也能解锁并继续写入。
+
+### 创建或解锁保险库
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py vault-create google_drive --path ComfyUI-Vault
+```
+
+如果阿里云盘上已经有一个用 Cryptomator 创建的保险库，用这个命令解锁：
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py vault-unlock aliyundrive --path 我的保险库
+```
+
+> ⚠️ **密码一旦丢失，文件无法恢复。** 本工具不保存密码，只在本机保存解锁后的密钥。
+
+### 用 Cryptomator 打开
+
+| 网盘 | 打开方式 |
+|---|---|
+| Google Drive | Cryptomator iOS/Android 版直接添加 Google Drive；或者在桌面端用 Google Drive 客户端同步到本地后，用 Cryptomator 桌面版打开 |
+| 阿里云盘 | Cryptomator 没有内置阿里云盘。可以把保险库文件夹下载到本地后用桌面版打开；或者用 OpenList/AList 把阿里云盘挂载成 WebDAV，再在 Cryptomator 里添加 WebDAV |
+
+### 限制与注意事项
+
+- **Google Drive 只能使用本工具创建的保险库。** 因为 `drive.file` 权限看不到其他应用创建的文件。阿里云盘没有这个限制。
+- **在 Google Drive 上，需要上传的文件夹请让节点自己创建。** 如果你先在 Cryptomator App 里建了同名文件夹，本工具看不到它，会再建一个同名的，导致保险库里出现两个重名文件夹。
+- **加密不会隐藏这些信息**：文件数量、大致大小、修改时间，以及目录层级的大致形状。
+- **服务器本身没有被加密**：保险库密钥保存在 GPU 服务器上。能登录这台服务器的人都能拿到密钥，生成的原图也是以明文形式先写到服务器上的。用完可以执行 `auth.py logout`；如果不想在服务器上保留原图，可以关闭 `keep_local_copy`。
+
+## 已下架的旧节点
+
+旧节点已被 ComfyUI 官方节点取代。打开旧工作流时如果提示缺少节点，请按下表替换：
+
+| 旧节点 | 官方替代 |
 |---|---|
 | Text Box 🍿 (`TextBox`) | **Text (Multiline)** (`PrimitiveStringMultiline`) |
 | Image Info 🍿 (`ImageInfo`) | **Get Image Size** (`GetImageSize`) |
-| Text Processor 🍿 (`TextProcessor`) | **Concatenate Text** (`StringConcatenate`), **Replace Text** (`StringReplace`), **Preview Any** (`PreviewAny`) |
-| Image Scaler 🍿 (`ImageScaler`) | **Scale Image to Total Pixels** (`ImageScaleToTotalPixels`, use `resolution_steps` for alignment), **Resize And Pad Image** (`ResizeAndPadImage`), **Resize Image/Mask** (`ResizeImageMaskNode`) |
+| Text Processor 🍿 (`TextProcessor`) | **Concatenate Text** (`StringConcatenate`)、**Replace Text** (`StringReplace`)、**Preview Any** (`PreviewAny`) |
+| Image Scaler 🍿 (`ImageScaler`) | **Scale Image to Total Pixels** (`ImageScaleToTotalPixels`，用 `resolution_steps` 对齐尺寸倍数)、**Resize And Pad Image** (`ResizeAndPadImage`)、**Resize Image/Mask** (`ResizeImageMaskNode`) |
 
-## Acknowledgements 🙏
+## 开发
 
-- [ComfyUI-Custom-Scripts](https://github.com/pythongosssss/ComfyUI-Custom-Scripts) by [pythongosssss](https://github.com/pythongosssss), which inspired the original text nodes.
+```bash
+pip install -r requirements.txt numpy pillow pytest ruff
+```
+
+```bash
+ruff check . && pytest
+```
+
+装有 Java 21+ 和 Maven 时，测试会额外运行与 Cryptomator 官方 `cryptofs` 库的互通性测试。
+
+## 致谢
+
+- [Cryptomator](https://github.com/cryptomator)：保险库格式与 `cryptofs` 参考实现
+- [ComfyUI-Custom-Scripts](https://github.com/pythongosssss/ComfyUI-Custom-Scripts)（pythongosssss）：早期文本节点的灵感来源

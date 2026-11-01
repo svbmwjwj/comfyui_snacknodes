@@ -1,10 +1,12 @@
 include LICENSE
 include README.md
 include pyproject.toml
+include requirements.txt
+include auth.py
 include web/icon.png
+
+recursive-include cloud_drive *.py
+recursive-include nodes *.py
 
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
-
-recursive-include docs *.rst conf.py Makefile make.bat *.jpg *.png *.gif
-

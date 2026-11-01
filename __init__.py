@@ -1,10 +1,13 @@
-"""ComfyUI SnackNodes package.
+"""ComfyUI SnackNodes package."""
 
-All previous nodes (Image Info, Image Scaler, Text Box, Text Processor) have been
-retired in favour of ComfyUI core nodes. See README.md for replacements.
-"""
+from .nodes.save_to_cloud_drive import SaveToCloudDrive
 
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
+NODE_CLASS_MAPPINGS = {
+    "SnackSaveToCloudDrive": SaveToCloudDrive,
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "SnackSaveToCloudDrive": "Save to Cloud Drive",
+}
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
