@@ -5,18 +5,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfyui_snacknodes"
-description = "A comprehensive collection of ComfyUI nodes designed to reduce reliance on multiple third-party node packages."
-version = "1.0.0"
+description = "Save ComfyUI outputs to your own Google Drive, WebDAV server (Nutstore, Nextcloud, NAS...) or Aliyun Drive, optionally end-to-end encrypted as a Cryptomator vault."
+version = "2.0.0"
 authors = [
     {name = "svbmwjwj", email = "255624542+svbmwjwj@users.noreply.github.com"}
 ]
 readme = "README.md"
 license = {text = "GNU General Public License v3"}
 dependencies = [
-    "torch",
-    "numpy",
-    "pillow",
-    "opencv-python-headless"
+    "requests",
+    "cryptography>=42",
 ]
 
 [project.urls]
@@ -26,3 +24,14 @@ Repository = "https://github.com/svbmwjwj/comfyui_snacknodes"
 PublisherId = "svbmwjwj"
 DisplayName = "comfyui_snacknodes"
 Icon = "https://raw.githubusercontent.com/svbmwjwj/comfyui_snacknodes/main/web/icon.png"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib -p no:cacheprovider"
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["tests/fake_http.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]

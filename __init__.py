@@ -1,26 +1,16 @@
 """ComfyUI SnackNodes package."""
 
-# Import nodes
-from .nodes.images.image_info import ImageInfo
-from .nodes.images.image_scaler import ImageScaler
-from .nodes.feature.text_box import TextBox
-from .nodes.feature.text_processor import TextProcessor
+from .nodes.save_to_cloud_drive import SaveToCloudDrive
 
 NODE_CLASS_MAPPINGS = {
-    "ImageInfo": ImageInfo,
-    "ImageScaler": ImageScaler,
-    "TextBox": TextBox,
-    "TextProcessor": TextProcessor,
+    "SnackSaveToCloudDrive": SaveToCloudDrive,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageInfo": "Image Info 🍿",
-    "ImageScaler": "Image Scaler 🍿",
-    "TextBox": "Text Box 🍿",
-    "TextProcessor": "Text Processor 🍿",
+    "SnackSaveToCloudDrive": "Save to Cloud Drive",
 }
 
-WEB_DIRECTORY = "web"
+# Frontend extension (shows the upload result on the node) and locales/ live next to this file.
+WEB_DIRECTORY = "./web"
 
-# Export node mappings
-__all__ = ["ImageInfo", "ImageScaler", "TextBox", "TextProcessor"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

@@ -1,0 +1,58 @@
+{
+  "SnackSaveToCloudDrive": {
+    "display_name": "Save to Cloud Drive",
+    "description": "Upload images, a video or existing files to your own cloud drive, optionally end-to-end encrypted.\n\nOne-time setup (in a terminal on the ComfyUI machine):\n  python custom_nodes/comfyui_snacknodes/auth.py google_drive\n  python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER\n  python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   (only for encrypt)\nCredentials are stored on that machine, never in the workflow.\n\nUsage\n- Connect images and/or video; pick the drive.\n- remote_folder: folder on the drive, created if missing. Date tokens:\n  ComfyUI/%date:yyyy-MM-dd%  ->  ComfyUI/2026-11-01\n  ComfyUI/%year%/%month%     ->  ComfyUI/2026/11\n- encrypt: file contents and names are encrypted before upload (Cryptomator vault);\n  open them with the Cryptomator app.\n- preview: show the images on the node after the run.\n- keep_local_copy: also keep the files in ComfyUI's output folder.\n- Advanced: filename_prefix (local file names); stop_on_error off = keep going and\n  output success = False instead of stopping the workflow.\n- Outputs: remote_paths (one line per file) and success (True/False) for automation.\n- file_paths (input): connect a text node listing files that already exist in the output\n  folder, one per line, e.g. video/ComfyUI_00001_.mp4\nExisting files are never overwritten (name_1, name_2 ...).",
+    "inputs": {
+      "provider": {
+        "name": "provider",
+        "tooltip": "Which cloud drive to upload to. Authorize it once with auth.py."
+      },
+      "remote_folder": {
+        "name": "remote_folder",
+        "tooltip": "Folder on the drive (inside the vault when encrypting); created if missing. Date tokens: %date:yyyy-MM-dd%, %year%, %month%, %day%, %hour%, %minute%, %second% (server local time). Example: ComfyUI/%date:yyyy-MM%"
+      },
+      "encrypt": {
+        "name": "encrypt",
+        "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open them with the Cryptomator app. Create the vault once with auth.py vault-create."
+      },
+      "preview": {
+        "name": "preview",
+        "tooltip": "Show the saved images on the node after the run."
+      },
+      "keep_local_copy": {
+        "name": "keep_local_copy",
+        "tooltip": "On: also keep the files in ComfyUI's output folder. Off: use the temp folder (cleared when ComfyUI restarts)."
+      },
+      "filename_prefix": {
+        "name": "filename_prefix",
+        "tooltip": "Name prefix for saved images/videos, same as Save Image. A sub folder is allowed, e.g. portraits/ComfyUI"
+      },
+      "stop_on_error": {
+        "name": "stop_on_error",
+        "tooltip": "On: a failed upload stops the workflow with an error. Off: the workflow continues and the success output is False (for automation)."
+      },
+      "images": {
+        "name": "images",
+        "tooltip": "Images to save as PNG and upload."
+      },
+      "video": {
+        "name": "video",
+        "tooltip": "Video to save as MP4 and upload."
+      },
+      "file_paths": {
+        "name": "file_paths",
+        "tooltip": "Optional: connect a text node listing existing files to upload, one per line, relative to ComfyUI's output folder, e.g. video/ComfyUI_00001_.mp4"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "remote_paths",
+        "tooltip": "One line per uploaded file: a share link when the drive provides one, otherwise provider:path."
+      },
+      "1": {
+        "name": "success",
+        "tooltip": "True when every file was uploaded. With stop_on_error off, a failed upload gives False instead of stopping the workflow, so you can branch on it."
+      }
+    }
+  }
+}
