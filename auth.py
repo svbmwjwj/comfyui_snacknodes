@@ -37,8 +37,9 @@ def _ask(prompt: str, value: str | None, secret: bool = False) -> str:
 
 def auth_google(args, store):
     from cloud_drive.google_drive import GoogleDrive
-    client_id = _ask("Google OAuth client ID: ", args.client_id)
-    client_secret = _ask("Google OAuth client secret: ", args.client_secret, secret=True)
+    client_id = _ask("Google OAuth client ID: ", args.client_id or os.environ.get("SNACK_GDRIVE_CLIENT_ID"))
+    client_secret = _ask("Google OAuth client secret: ",
+                         args.client_secret or os.environ.get("SNACK_GDRIVE_CLIENT_SECRET"), secret=True)
     drive = GoogleDrive(store)
     flow = drive.start_device_flow(client_id)
     print(f"\n  1. On any device, open:  {flow['verification_url']}")
@@ -50,8 +51,10 @@ def auth_google(args, store):
 
 def auth_aliyun(args, store):
     from cloud_drive.aliyundrive import AliyunDrive
-    client_id = _ask("Aliyun Drive Open Platform client_id: ", args.client_id)
-    client_secret = _ask("Aliyun Drive Open Platform client_secret: ", args.client_secret, secret=True)
+    client_id = _ask("Aliyun Drive Open Platform client_id: ",
+                     args.client_id or os.environ.get("SNACK_ALIYUNDRIVE_CLIENT_ID"))
+    client_secret = _ask("Aliyun Drive Open Platform client_secret: ",
+                         args.client_secret or os.environ.get("SNACK_ALIYUNDRIVE_CLIENT_SECRET"), secret=True)
     drive = AliyunDrive(store)
     if args.refresh_token:
         drive.import_refresh_token(client_id, client_secret, args.refresh_token)

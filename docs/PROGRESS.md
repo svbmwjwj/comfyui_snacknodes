@@ -38,6 +38,15 @@
 | 用 Cryptomator App 打开 Google Drive 上的保险库 | 需要真机 | 在手机上安装 Cryptomator，添加 Google Drive |
 | 在真实 ComfyUI 中加载节点、执行工作流 | 权限策略拦截了"安装并运行外部 ComfyUI 代码" | 二选一：授权在当前环境安装 ComfyUI；或在 AutoDL 上 clone 这个分支，把启动日志发过来 |
 
+## 测试前的环境配置（在云环境设置里完成，不要把密钥贴进聊天）
+
+在会话标题栏的云环境菜单 → 编辑（Edit）中设置：
+
+- 环境变量：`SNACK_GDRIVE_CLIENT_ID`、`SNACK_GDRIVE_CLIENT_SECRET`
+- 阿里云盘（可选）：环境变量 `SNACK_ALIYUNDRIVE_CLIENT_ID`、`SNACK_ALIYUNDRIVE_CLIENT_SECRET`，并在网络访问里放行 `openapi.alipan.com`、`*.aliyundrive.net`、`*.alipan.com`
+
+改完后要开一个新会话才会生效。新会话里先读本文件，然后从"测试步骤"开始。
+
 ## 测试步骤（准备好后照做）
 
 1. **Google Drive**：运行 `python auth.py google_drive --client-id … --client-secret …`，在手机上输入验证码
