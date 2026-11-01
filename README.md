@@ -1,6 +1,6 @@
 # SnackNodes 🍿
 
-**Save to Cloud Drive**：把 ComfyUI 生成的图片、视频或文件直接上传到你自己的 **Google Drive** 或 **阿里云盘**。可选**端到端加密**，加密格式与 [Cryptomator](https://cryptomator.org) 保险库完全兼容，网盘服务商看不到文件内容和文件名。
+**Save to Cloud Drive**：把 ComfyUI 生成的图片、视频或文件直接上传到你自己的 **Google Drive** 或任意 **WebDAV** 网盘/服务器（坚果云、Nextcloud、群晖等 NAS、OpenList/AList……）。可选**端到端加密**，加密格式与 [Cryptomator](https://cryptomator.org) 保险库完全兼容，网盘服务商看不到文件内容和文件名。
 
 适合在 AutoDL 等租卡平台、或任何远程 GPU 服务器上运行 ComfyUI 的个人用户。
 
@@ -9,7 +9,8 @@
 - 接收 `images`、`video`，或 output 目录中已有文件的路径（`file_paths`，一行一个）
 - 可选在本地保留一份副本，也可以只用临时目录
 - 远程文件夹可以自己设置，不存在时会自动创建；支持日期变量，例如 `ComfyUI/%date:yyyy-MM%` 会自动按月归档（详见下文）
-- 输出上传结果：Google Drive 返回分享链接；阿里云盘和加密文件返回 `provider:路径`
+- 输出上传结果：Google Drive 返回分享链接；其他网盘和加密文件返回 `provider:路径`
+- 不会覆盖网盘上已有的文件：WebDAV 和保险库里同名文件会自动加 `_1`、`_2` 后缀
 - 凭据和密钥**不会写进工作流**，分享工作流不会泄露账号
 - 分片上传，网络错误或限流时自动重试；Google Drive 支持断点续传
 - 网络代理：遵循标准的 `HTTPS_PROXY` 环境变量，网络问题需要用户自行解决
@@ -49,16 +50,33 @@ python custom_nodes/comfyui_snacknodes/auth.py google_drive
 
 </details>
 
-### 阿里云盘
+### WebDAV（坚果云、Nextcloud、NAS、OpenList……）
 
-1. 在[阿里云盘开放平台](https://www.alipan.com/developer)注册开发者并创建应用，记下 `client_id` 和 `client_secret`。
-2. 运行下面的命令，打开它输出的二维码链接，用阿里云盘 App 扫码确认：
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py webdav --url https://dav.jianguoyun.com/dav/ --username 你的账号
+```
+
+按提示输入密码。工具会先连一次服务器，确认地址和密码正确后才保存。
+
+| 服务 | 地址 | 密码 |
+|---|---|---|
+| 坚果云 | `https://dav.jianguoyun.com/dav/` | 在 账户信息 → 安全选项 → 第三方应用管理 里生成的**应用密码**，不是登录密码 |
+| Nextcloud / ownCloud | `https://你的域名/remote.php/dav/files/用户名/` | 建议在 设置 → 安全 里生成应用密码 |
+| 群晖 / 威联通等 NAS | 在 NAS 上开启 WebDAV 服务后的地址 | NAS 账号密码 |
+| OpenList / AList | `https://你的域名/dav/` | OpenList 用户密码。可借它把阿里云盘、夸克、115 等挂载出来再上传 |
+
+- 尽量使用 `https://`。用 `http://` 连接非本机地址时，密码会明文传输，工具会给出警告。
+- 坚果云免费版有 WebDAV 请求次数限制（每 30 分钟约 600 次），大批量上传时可能会被限流，工具会自动重试。
+
+### 阿里云盘（仅限已有开放平台应用的开发者）
+
+> 阿里云盘开放平台自 2025 年 7 月 1 日起**暂停个人开发者申请**。只有已经注册过开放平台应用的开发者才能用这种方式；其他用户请用 OpenList 挂载阿里云盘，再按上面的 WebDAV 方式连接。
 
 ```bash
 python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID --client-secret 你的Secret
 ```
 
-如果扫码授权失败，可以加上 `--refresh-token 你的token`，直接导入一个已有的 refresh token。
+运行后打开输出的二维码链接，用阿里云盘 App 扫码确认。如果扫码授权失败，可以加上 `--refresh-token 你的token`，直接导入一个已有的 refresh token。
 
 默认上传到"资源库"。如果想传到"备份盘"，在凭据文件的 `aliyundrive` 项中加上 `"drive": "backup"`。
 
@@ -73,7 +91,7 @@ python custom_nodes/comfyui_snacknodes/auth.py logout google_drive
 ```
 
 凭据保存在 `~/.config/comfyui_snacknodes/cloud_drive.json`，文件权限为 600。可以用 `SNACKNODES_CONFIG_DIR` 环境变量修改位置。
-也可以不用凭据文件，改用环境变量：`SNACK_GDRIVE_CLIENT_ID` / `SNACK_GDRIVE_CLIENT_SECRET` / `SNACK_GDRIVE_REFRESH_TOKEN`，阿里云盘对应 `SNACK_ALIYUNDRIVE_*`。
+也可以不用凭据文件，改用环境变量：`SNACK_GDRIVE_CLIENT_ID` / `SNACK_GDRIVE_CLIENT_SECRET` / `SNACK_GDRIVE_REFRESH_TOKEN`；WebDAV 对应 `SNACK_WEBDAV_URL` / `SNACK_WEBDAV_USERNAME` / `SNACK_WEBDAV_PASSWORD`；阿里云盘对应 `SNACK_ALIYUNDRIVE_*`。
 
 ## 远程文件夹与日期变量
 
@@ -112,10 +130,10 @@ python custom_nodes/comfyui_snacknodes/auth.py vault-create google_drive --path 
 
 也可以直接加 `--generate-password` 或 `--own-password` 跳过选择。
 
-如果阿里云盘上已经有一个用 Cryptomator 创建的保险库，用这个命令解锁：
+如果 WebDAV（或阿里云盘）上已经有一个用 Cryptomator App 创建的保险库，用这个命令解锁，之后节点会往里面继续写入：
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py vault-unlock aliyundrive --path 我的保险库
+python custom_nodes/comfyui_snacknodes/auth.py vault-unlock webdav --path 我的保险库
 ```
 
 > ⚠️ **密码是恢复文件的唯一方式。** 没有找回、重置或恢复密钥，请立即存进密码管理器。本工具不保存密码，只在本机保存解锁后的密钥。
@@ -125,11 +143,12 @@ python custom_nodes/comfyui_snacknodes/auth.py vault-unlock aliyundrive --path �
 | 网盘 | 打开方式 |
 |---|---|
 | Google Drive | Cryptomator iOS/Android 版直接添加 Google Drive；或者在桌面端用 Google Drive 客户端同步到本地后，用 Cryptomator 桌面版打开 |
+| WebDAV | Cryptomator 各平台都原生支持 WebDAV：添加 WebDAV，填同样的地址、账号和密码即可直接打开 |
 | 阿里云盘 | Cryptomator 没有内置阿里云盘。可以把保险库文件夹下载到本地后用桌面版打开；或者用 OpenList/AList 把阿里云盘挂载成 WebDAV，再在 Cryptomator 里添加 WebDAV |
 
 ### 限制与注意事项
 
-- **Google Drive 只能使用本工具创建的保险库。** 因为 `drive.file` 权限看不到其他应用创建的文件。阿里云盘没有这个限制。
+- **Google Drive 只能使用本工具创建的保险库。** 因为 `drive.file` 权限看不到其他应用创建的文件。WebDAV 和阿里云盘没有这个限制。
 - **在 Google Drive 上，需要上传的文件夹请让节点自己创建。** 如果你先在 Cryptomator App 里建了同名文件夹，本工具看不到它，会再建一个同名的，导致保险库里出现两个重名文件夹。
 - **加密不会隐藏这些信息**：文件数量、大致大小、修改时间，以及目录层级的大致形状。
 - **服务器本身没有被加密**：保险库密钥保存在 GPU 服务器上。能登录这台服务器的人都能拿到密钥，生成的原图也是以明文形式先写到服务器上的。用完可以执行 `auth.py logout`；如果不想在服务器上保留原图，可以关闭 `keep_local_copy`。

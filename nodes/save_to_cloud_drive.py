@@ -72,7 +72,7 @@ def _resolve_local_file(path: str) -> str:
 
 
 class SaveToCloudDrive:
-    """Save outputs locally, then upload them to Google Drive or Aliyun Drive,
+    """Save outputs locally, then upload them to Google Drive, a WebDAV server or Aliyun Drive,
     optionally end-to-end encrypted into a Cryptomator vault."""
 
     CATEGORY = "SnackNodes"
@@ -86,7 +86,7 @@ class SaveToCloudDrive:
                    "end-to-end encrypted (Cryptomator vault). Authorize once with auth.py; credentials and "
                    "keys are never stored in the workflow.")
     SEARCH_ALIASES = ["upload", "google drive", "aliyun", "alipan", "cloud", "export", "backup",
-                      "encrypt", "cryptomator"]
+                      "encrypt", "cryptomator", "webdav", "nutstore", "jianguoyun", "nextcloud"]
 
     @classmethod
     def INPUT_TYPES(cls):

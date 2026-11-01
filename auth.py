@@ -2,6 +2,7 @@
 """One-time setup for Save to Cloud Drive. Run on the machine that runs ComfyUI.
 
   python auth.py google_drive  [--client-id ID --client-secret SECRET]
+  python auth.py webdav        --url https://dav.example.com/ --username USER
   python auth.py aliyundrive   --client-id ID --client-secret SECRET
   python auth.py vault-create  google_drive  --path ComfyUI-Vault  [--generate-password]
   python auth.py vault-unlock  aliyundrive   --path ComfyUI-Vault
@@ -74,6 +75,17 @@ def auth_aliyun(args, store):
     print("Aliyun Drive authorized.")
 
 
+def auth_webdav(args, store):
+    from cloud_drive.webdav import WebDAV, is_insecure_url
+    url = _ask("WebDAV URL (e.g. https://dav.jianguoyun.com/dav/): ", args.url or os.environ.get("SNACK_WEBDAV_URL"))
+    if is_insecure_url(url):
+        print("WARNING: plain http:// sends your password unencrypted. Use https:// if the server supports it.")
+    username = _ask("Username: ", args.username or os.environ.get("SNACK_WEBDAV_USERNAME"))
+    password = os.environ.get("SNACK_WEBDAV_PASSWORD") or getpass.getpass("Password (app password if offered): ")
+    WebDAV(store).configure(url, username, password)
+    print(f"WebDAV connected: {url}")
+
+
 PASSWORD_WARNING = """
   !! The vault password is the ONLY way to recover your files. There is no reset
   !! and no recovery key. Save it in a password manager now.
@@ -138,7 +150,7 @@ def vault(args, store, create: bool):
 
 def status(store):
     for name, cls in PROVIDERS.items():
-        authed = bool(cls(store)._creds().get("refresh_token"))
+        authed = cls(store).is_authorized()
         v = store.get(f"vault:{name}")
         vault_txt = f", vault: {v['path']}" if v.get("enc_key") else ""
         print(f"{cls.display_name:14} {'authorized' if authed else 'not authorized'}{vault_txt}")
@@ -148,13 +160,16 @@ def status(store):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in PROVIDERS:
+    for name in ("google_drive", "aliyundrive"):
         p = sub.add_parser(name, help=f"Authorize {PROVIDERS[name].display_name}")
         own = " (optional: a built-in client is used by default)" if name == "google_drive" else ""
         p.add_argument("--client-id", help="Your own OAuth client ID" + own)
         p.add_argument("--client-secret", help="Your own OAuth client secret" + own)
         if name == "aliyundrive":
             p.add_argument("--refresh-token", help="Skip the QR code and import an existing refresh token")
+    p = sub.add_parser("webdav", help="Connect a WebDAV server (Nutstore/坚果云, Nextcloud, NAS, OpenList...)")
+    p.add_argument("--url")
+    p.add_argument("--username")
     for cmd in ("vault-create", "vault-unlock"):
         p = sub.add_parser(cmd, help=f"{cmd.split('-')[1].title()} a Cryptomator vault")
         p.add_argument("provider", choices=list(PROVIDERS))
@@ -174,6 +189,8 @@ def main():
             auth_google(args, store)
         elif args.cmd == "aliyundrive":
             auth_aliyun(args, store)
+        elif args.cmd == "webdav":
+            auth_webdav(args, store)
         elif args.cmd in ("vault-create", "vault-unlock"):
             vault(args, store, create=args.cmd == "vault-create")
         elif args.cmd == "status":

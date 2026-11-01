@@ -104,6 +104,12 @@ class Provider:
     def download(self, file_id: str) -> bytes:
         raise NotImplementedError
 
+    def _creds(self) -> dict[str, Any]:
+        return {}
+
+    def is_authorized(self) -> bool:
+        return bool(self._creds().get("refresh_token"))
+
     # shared ---------------------------------------------------------------
     def ensure_child_folder(self, parent_id: str, name: str) -> str:
         key = (parent_id, name)

@@ -21,6 +21,10 @@
 
 - 只面向个人用户，不接入云厂商的对象存储（如 S3、GCS）
 - 先做阿里云盘和 Google Drive，因为它们有官方接口
+- （2026-11-01）**阿里云盘开放平台自 2025-07-01 起暂停个人开发者申请**（只接企业，需发邮件对接）。现有代码保留，只给已有开放平台应用的老开发者用；README 引导其他用户通过 OpenList 挂载后走 WebDAV
+- （2026-11-01）**百度网盘开放平台同样已下线个人认证和个人创建应用**（已创建的个人应用不受影响，新申请只接企业认证），暂不接入。来源：贴吧官方回复、第三方接入指南；官方文档域名在本环境打不开，未能直接核对
+- （2026-11-01）**新增通用 WebDAV**：一次覆盖坚果云、Nextcloud、NAS、OpenList（可中转阿里云盘、夸克、115 等）。Cryptomator 各端都原生支持 WebDAV，可以直接打开保险库
+- （2026-11-01）发布计划：Google Drive 和 WebDAV 做好、测好后一起发布
 - 夸克网盘和 iCloud 只能走非官方接口，暂缓。iCloud 是美区账号（以后可能换德区），都在国际服务器上，技术上可行
 - 腾讯网盘还在内测，暂未发现公开接口，暂缓
 - 网络问题由用户自己解决，工具遵循 `HTTPS_PROXY`
@@ -28,9 +32,13 @@
 
 ## 已验证
 
-- 43 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试），`ruff check .` 无报错
+- 51 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
+- **WebDAV 本地实测通过（2026-11-01，WsgiDAV 4.4 服务端，Basic 认证）**：
+  - `auth.py webdav` 会先测试连接：密码错误时给出友好提示（并提醒坚果云要用应用密码），正确时才保存
+  - 通过节点上传图片和 15 MB 视频到 `ComfyUI/测试 目录/%date:yyyy-MM%`：中文、空格、日期变量都正确，内容逐字节一致；同名文件自动改为 `_1`，不会覆盖
+  - 加密：本工具通过 WebDAV 建的保险库，官方 `cryptofs` 解密后 SHA-256 一致；`cryptofs` 建的保险库，本工具通过 WebDAV `vault-unlock` 后继续写入，官方仍能读出全部文件（含原有的 `hello.txt`）
 - **Google Drive 实测通过（2026-11-01）**：
   - 设备码授权成功。首次授权报"尚未完成 Google 验证流程"（403 access_denied），原因是同意屏幕处于"测试中"，且账号不在测试用户名单里；把账号加为测试用户（或发布为正式版）后就能通过，代码不用改
   - 普通上传：通过节点上传 1 张 PNG（804 B，带 prompt 元数据）和 1 个 MP4（15.2 MB，按 8 MiB 分块，共 2 块，走断点续传），都返回了分享链接；下载回来逐字节一致，md5 与 Drive 记录的相同，MIME 类型正确，目录 `ComfyUI-Test/plain` 自动创建
@@ -42,7 +50,8 @@
 
 | 项目 | 阻碍 | 需要准备什么 |
 |---|---|---|
-| 阿里云盘真实授权和上传 | 环境网络策略拦截了相关域名 | 在环境设置里放行 `openapi.alipan.com`、`*.aliyundrive.net`、`*.alipan.com`；准备开放平台应用的 client_id 和 secret |
+| 坚果云真实上传 | 环境网络策略需放行 `dav.jianguoyun.com` | 坚果云账号和应用密码（设到环境变量 `SNACK_WEBDAV_URL`、`SNACK_WEBDAV_USERNAME`、`SNACK_WEBDAV_PASSWORD`）；之后用手机 Cryptomator 添加 WebDAV 打开保险库 |
+| 阿里云盘真实授权和上传（降级为可选） | 环境网络策略拦截了相关域名 | 在环境设置里放行 `openapi.alipan.com`、`*.aliyundrive.net`、`*.alipan.com`；准备开放平台应用的 client_id 和 secret |
 | 阿里云盘扫码授权接口 | 官方文档（语雀）在当前环境打不开，OpenList 源码里也没有这个接口 | 实测时验证；失败就改用 `--refresh-token` |
 | 用 Cryptomator App 打开 Google Drive 上的保险库 | 需要真机 | 在手机上安装 Cryptomator，添加 Google Drive |
 | 在真实 ComfyUI 中加载节点、执行工作流 | 权限策略拦截了"安装并运行外部 ComfyUI 代码" | 二选一：授权在当前环境安装 ComfyUI；或在 AutoDL 上 clone 这个分支，把启动日志发过来 |
@@ -59,8 +68,9 @@
 ## 测试步骤（准备好后照做）
 
 1. **Google Drive**：✅ 已完成（见"已验证"）。还剩两项：用手机 Cryptomator 打开 `ComfyUI-Vault-Test` 核对；测完后删除测试用的 OAuth 客户端，并执行 `auth.py logout google_drive`
-2. **阿里云盘**：放行域名之后，按同样的流程测一遍，另外测一次 `vault-unlock` 解锁已有保险库
-3. **ComfyUI 实机**：确认节点能出现在节点列表里，并跑通一次"生成图片 → 上传"
+2. **WebDAV / 坚果云**：本地服务端已测通。放行 `dav.jianguoyun.com` 并配好环境变量后，用真实坚果云再测一遍，并用手机 Cryptomator（添加 WebDAV）打开保险库
+3. **阿里云盘**（可选，需要已有开放平台应用）：放行域名之后，按同样的流程测一遍
+4. **ComfyUI 实机**：确认节点能出现在节点列表里，并跑通一次"生成图片 → 上传"
 
 ## 合并前注意
 
@@ -76,5 +86,5 @@
 
 - 做一个 Comfy Cloud 同步工具：在节点外部运行，通过 Comfy Cloud API v2（`GET /api/v2/assets/{id}/content`）下载生成结果，再上传到网盘或保险库。注意结果有 `expires_at` 过期时间
 - iCloud（非官方接口，国际账号）
-- 夸克网盘（基于 Cookie 的非官方接口）
+- 夸克网盘（基于 Cookie 的非官方接口；也可以先通过 OpenList + WebDAV 使用）
 - 腾讯网盘（等它开放接口或 MCP）
