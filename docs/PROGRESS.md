@@ -103,15 +103,14 @@
 
 ## 合并前注意
 
+- **发布方式（2026-11-01 决定）**：只保留官方推荐的 `publish_action.yml`（Comfy-Org/publish-node-action 的示例），已删除 `publish_node.yml`。规则：main 分支上 `pyproject.toml` 有改动就发布其中的版本号；不改版本号不会发新版。发布失败时可在 Actions 页面手动 Run workflow 重发
 - **版本号**：Registry 上当前是 v1.0.1（用户确认，2026-11-01）；本次发布用 2.0.0（删除旧节点属于不兼容改动）
 - **发布密钥**：仓库只跑过一次发布流程（2026-05-05，失败），很可能缺少 `REGISTRY_ACCESS_TOKEN`。配置方法：在 registry.comfy.org 的发布者 svbmwjwj 页面创建 API Key，再到 GitHub 仓库 Settings → Secrets and variables → Actions → New repository secret，名称填 `REGISTRY_ACCESS_TOKEN`
 
-- **（2026-11-01 决定）先不发布，等阿里云盘也做好、测好后一起发布。** 在此之前不要合并到 main：合并后 `publish_action.yml` 会自动发布。发布时再决定两个发布流程保留哪一个
-
+- **（2026-11-01 决定）先不发布，等阿里云盘也做好、测好后一起发布。** 在此之前不要合并到 main：合并后 `publish_action.yml` 会自动发布。
 - **隐私政策链接**：Google 同意屏幕里的链接现在指向 `blob/claude/stoic-fermat-wano83/PRIVACY.md`，合并后要改成 `blob/main/PRIVACY.md`，否则删除分支后链接会失效
 
 - 合并到 main 后，`publish_action.yml` 会自动把 2.0.0 发布到 Comfy Registry，发布后旧节点会消失
-- `publish_action.yml` 和 `publish_node.yml` 是两个重复的发布流程，建议只保留一个
 - 要从 Registry 真正下架或弃用旧版本，需要在 registry.comfy.org 的发布者后台手动操作
 
 ## 后续可能要做的
