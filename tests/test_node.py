@@ -185,14 +185,19 @@ def test_stop_on_error(node_module, monkeypatch):
 
     class Broken:  # uses the node's own CloudDriveError (package import, not tests/ path)
         def upload(self, *a, **kw):
-            raise mod.CloudDriveError("HTTP 503 server busy")
+            raise mod.CloudDriveError("PUT https://x/a.png failed: HTTP 409 Conflict", status=409)
     monkeypatch.setitem(mod.PROVIDERS, "google_drive", Broken)
     images = FakeTensor(np.random.rand(1, 8, 8, 3).astype(np.float32))
-    with pytest.raises(RuntimeError, match="503"):
+    with pytest.raises(RuntimeError) as info:
         _upload(mod, "Google Drive", "none", "a", "p", images=images)
+    msg = str(info.value)
+    assert "网盘目录不可写" in msg and "cannot be created" in msg  # locale unknown in tests: both
+    assert "HTTP 409 Conflict" in msg and "p_00001_.png" in msg
     res = _upload(mod, "Google Drive", "none", "a", "q", images=images, stop_on_error=False)
     assert res["result"] == ("", False)
-    assert res["ui"]["upload_ok"] == [False] and "503" in res["ui"]["upload_error"][0]
+    err = res["ui"]["upload_error"][0]
+    assert res["ui"]["upload_ok"] == [False] and err["code"] == "conflict"
+    assert err["zh"].startswith("网盘目录不可写") and "409" in err["detail"]
 
 
 def test_progress_reports_bytes_over_all_files(node_module, monkeypatch, tmp_path):

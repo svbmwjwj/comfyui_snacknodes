@@ -16,7 +16,8 @@ from urllib.parse import quote, urlsplit
 
 import requests
 
-from .base import DEFAULT_TIMEOUT, RETRY_STATUS, AuthRequired, CloudDriveError, Progress, Provider, request
+from .base import (DEFAULT_TIMEOUT, RETRY_STATUS, AuthRequired, CloudDriveError, Progress, Provider,
+                   raise_after_retries, request)
 from .config import CredentialStore
 
 NAME = "webdav"
@@ -103,8 +104,9 @@ class WebDAV(Provider):
         try:
             return request(self.session, method, self._url(path), auth=auth, ok=ok, sleep=self.sleep, **kw)
         except CloudDriveError as e:
-            if " 401 " in str(e) or " 403 " in str(e):
-                raise AuthRequired(f"WebDAV rejected the credentials or path ({e}). {AUTH_HINT}") from e
+            # 401 = credentials; 403 = this path is not writable (kept as a plain error)
+            if e.status == 401:
+                raise AuthRequired(f"WebDAV rejected the credentials ({e}). {AUTH_HINT}", status=401) from e
             raise
 
     def configure(self, url: str, username: str, password: str) -> None:
@@ -116,10 +118,12 @@ class WebDAV(Provider):
                     auth=_basic_auth(username, password),
                     headers={"Depth": "0", "Content-Type": "application/xml"}, data=PROPFIND_BODY)
         except CloudDriveError as e:
-            if " 401 " in str(e):
+            if e.status == 401:
                 raise CloudDriveError(f"{url}: wrong username or password (HTTP 401). Services such as "
-                                      f"Nutstore/坚果云 need an app password, not your login password.") from e
-            raise CloudDriveError(f"Could not open {url}: {e}") from e
+                                      f"Nutstore/坚果云 need an app password, not your login password.",
+                                      status=401) from e
+            raise CloudDriveError(f"Could not open {url}: {e}", status=e.status, body=e.body,
+                                  network=e.network) from e
         self.store.update(NAME, {"url": url, "username": username, "password": password})
 
     # ---------------------------------------------------------- primitives
@@ -166,11 +170,13 @@ class WebDAV(Provider):
             else:
                 if resp.status_code in (200, 201, 204):
                     return path, final, None
-                if resp.status_code in (401, 403):
-                    raise AuthRequired(f"WebDAV refused the upload: HTTP {resp.status_code}. {AUTH_HINT}")
+                if resp.status_code == 401:
+                    raise AuthRequired(f"WebDAV refused the upload: HTTP 401. {AUTH_HINT}", status=401)
                 if resp.status_code not in RETRY_STATUS:
-                    raise CloudDriveError(f"PUT {url} failed: HTTP {resp.status_code} {resp.text[:300]}")
-                last = CloudDriveError(f"HTTP {resp.status_code}")
+                    raise CloudDriveError(f"PUT {url} failed: HTTP {resp.status_code} {resp.text[:300]}",
+                                          status=resp.status_code, body=resp.text[:2000])
+                last = CloudDriveError(f"HTTP {resp.status_code}", status=resp.status_code, body=resp.text[:2000])
             if attempt < 3:
                 self.sleep(2.0 * (2 ** attempt))
-        raise CloudDriveError(f"PUT {url} failed after 4 attempts: {last}")
+        raise_after_retries(f"PUT {url}", 4, last)
+        raise AssertionError("unreachable")

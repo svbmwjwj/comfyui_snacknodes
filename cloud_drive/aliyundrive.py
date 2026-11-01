@@ -211,7 +211,8 @@ class AliyunDrive(Provider):
                     return
                 if resp.status_code != 403 or attempt == 1:
                     raise CloudDriveError(f"Aliyun Drive part {number} upload failed: "
-                                          f"HTTP {resp.status_code} {resp.text[:300]}")
+                                          f"HTTP {resp.status_code} {resp.text[:300]}",
+                                          status=resp.status_code, body=resp.text[:2000])
             # missing or expired (403) signed URL: ask for a fresh one
             fresh = self._post("/adrive/v1.0/openFile/getUploadUrl", {
                 "drive_id": drive_id, "file_id": file_id, "upload_id": upload_id,

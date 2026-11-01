@@ -13,7 +13,8 @@ import numpy as np
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
-from ..cloud_drive import PROVIDERS, CloudDriveError
+from ..cloud_drive import PROVIDERS, CloudDriveError  # noqa: F401 - re-exported for callers and tests
+from ..cloud_drive.errors import explain, ui_locale
 from ..cloud_drive.vault import CryptomatorVault
 
 logger = logging.getLogger(__name__)
@@ -241,38 +242,38 @@ Existing files are never overwritten (name_1, name_2 ...)."""
             raise ValueError("Nothing to upload: connect images or video, or fill in file_paths.")
 
         results: list[str] = []
-        error = None
+        failure = None
         reporter = _ProgressReporter(to_upload, unique_id)
+        current = None
         try:
             client = PROVIDERS[provider_name]()
             vault = CryptomatorVault.load(client) if encrypt else None
             for index, path in enumerate(to_upload):
+                current = path
                 mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
                 on_progress = reporter.for_file(index)
-                try:
-                    if vault is not None:
-                        result = vault.upload(path, remote_folder, progress=on_progress)
-                    else:
-                        result = client.upload(path, remote_folder, mime_type=mime, progress=on_progress)
-                except CloudDriveError as e:
-                    raise CloudDriveError(f"{os.path.basename(path)}: {e}"
-                                          + (f" (local copy kept at {path})" if keep_local_copy else "")) from e
+                if vault is not None:
+                    result = vault.upload(path, remote_folder, progress=on_progress)
+                else:
+                    result = client.upload(path, remote_folder, mime_type=mime, progress=on_progress)
                 reporter.file_done(index)
                 logger.info("Uploaded %s -> %s", path, result.describe())
                 results.append(result.describe())
-        except CloudDriveError as e:
-            error = f"Upload to {provider} failed: {e}"
+        except Exception as e:  # noqa: BLE001 - every upload failure is explained to the user
+            failure = explain(e, provider_name, provider,
+                              file_name=os.path.basename(current) if current else "",
+                              local_copy=current if (current and keep_local_copy) else "")
+            logger.warning("Upload to %s failed [%s]: %s", provider, failure.code, failure.detail)
             if stop_on_error:
-                raise RuntimeError(error) from e
-            logger.warning("%s (stop_on_error is off, continuing)", error)
+                raise RuntimeError(f"{failure.text(ui_locale())}\n\n{failure.detail}") from e
 
         text = "\n".join(results)
-        ui = {"text": [text], "upload_ok": [error is None], "upload_total": [len(to_upload)]}
-        if error:
-            ui["upload_error"] = [error]
+        ui = {"text": [text], "upload_ok": [failure is None], "upload_total": [len(to_upload)]}
+        if failure:
+            ui["upload_error"] = [{"code": failure.code, "zh": failure.zh, "en": failure.en, "detail": failure.detail}]
         if preview and ui_images:
             ui["images"] = ui_images
-        return {"ui": ui, "result": (text, error is None)}
+        return {"ui": ui, "result": (text, failure is None)}
 
     @staticmethod
     def _save_images(images, filename_prefix, out_dir, save_type, prompt, extra_pnginfo):

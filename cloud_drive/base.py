@@ -16,7 +16,17 @@ Progress = Callable[[int, int], None]
 
 
 class CloudDriveError(RuntimeError):
-    """Raised when a cloud drive operation fails."""
+    """Raised when a cloud drive operation fails.
+
+    status / body: the last HTTP response, when there was one; network: the request
+    never got an answer (DNS, proxy, timeout, connection reset). errors.py uses these
+    to explain the failure to the user."""
+
+    def __init__(self, message: str, *, status: Optional[int] = None, body: str = "", network: bool = False):
+        super().__init__(message)
+        self.status = status
+        self.body = body
+        self.network = network
 
 
 class AuthRequired(CloudDriveError):
@@ -64,13 +74,21 @@ def request(
             if resp.status_code in ok:
                 return resp
             if resp.status_code not in RETRY_STATUS or attempt == retries:
-                raise CloudDriveError(
-                    f"{method} {url} failed: HTTP {resp.status_code} {resp.text[:500]}"
-                )
-            last_error = CloudDriveError(f"HTTP {resp.status_code}")
+                raise CloudDriveError(f"{method} {url} failed: HTTP {resp.status_code} {resp.text[:500]}",
+                                      status=resp.status_code, body=resp.text[:2000])
+            last_error = CloudDriveError(f"HTTP {resp.status_code}", status=resp.status_code,
+                                         body=resp.text[:2000])
         if attempt < retries:
             sleep(backoff * (2**attempt))
-    raise CloudDriveError(f"{method} {url} failed after {retries + 1} attempts: {last_error}")
+    raise_after_retries(f"{method} {url}", retries + 1, last_error)
+
+
+def raise_after_retries(what: str, attempts: int, last_error: Optional[Exception]) -> None:
+    """Final error after retrying, keeping the HTTP status or marking it as a network failure."""
+    if isinstance(last_error, CloudDriveError):
+        raise CloudDriveError(f"{what} failed after {attempts} attempts: {last_error}",
+                              status=last_error.status, body=last_error.body)
+    raise CloudDriveError(f"{what} failed after {attempts} attempts: {last_error}", network=True)
 
 
 def split_folder(path: str) -> list[str]:

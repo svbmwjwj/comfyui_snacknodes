@@ -14,6 +14,10 @@ from . import cryptomator as cm
 from .base import CloudDriveError, Progress, Provider, UploadResult, split_folder
 from .config import CredentialStore
 
+class VaultNotConfigured(CloudDriveError):
+    """Encryption is on but no vault was created/unlocked for this drive."""
+
+
 AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py vault-create (or vault-unlock)"
 
 
@@ -61,7 +65,7 @@ class CryptomatorVault:
     def load(cls, provider: Provider, store: Optional[CredentialStore] = None) -> CryptomatorVault:
         data = (store or CredentialStore()).get(_store_key(provider.name))
         if not data.get("enc_key"):
-            raise CloudDriveError(f"No vault configured for {provider.display_name}. {AUTH_HINT}")
+            raise VaultNotConfigured(f"No vault configured for {provider.display_name}. {AUTH_HINT}")
         return cls(provider, data["path"], cm.VaultKeys.from_dict(data))
 
     # ---------------------------------------------------------- internals
