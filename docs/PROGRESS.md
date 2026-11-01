@@ -1,6 +1,6 @@
 # 开发记录与测试计划
 
-最后更新：2026-11-01 · **2.0.0 已合并到 main 并发布到 Comfy Registry**
+最后更新：2026-11-01 · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
 
 ## 已完成
 
@@ -112,14 +112,16 @@
 - ~~合并即发布~~（已完成）：Google Drive、WebDAV 和界面都已测完（阿里云盘因开放平台不再接受个人开发者，改为可选）。合并到 main 就会自动发布 2.0.0，合并前确认 `REGISTRY_ACCESS_TOKEN` 已配好。
 - **隐私政策链接**：Google 同意屏幕里的链接现在指向 `blob/claude/stoic-fermat-wano83/PRIVACY.md`，合并后要改成 `blob/main/PRIVACY.md`，否则删除分支后链接会失效
 
-- **项目主页（2026-11-01）**：Google 修改品牌信息时要求品牌验证，`github.com` 无法证明归属，所以改用项目方自己的域名 `snacknodes.linksluckytime.com`，用 GitHub Pages 托管 `docs/`（`index.html`、`privacy.html`、`CNAME`、`.nojekyll`）。需项目方操作：
-  1. DNS：添加 CNAME `snacknodes` → `svbmwjwj.github.io`；在 Google Search Console 添加「网域」资源 `linksluckytime.com`，按提示加 TXT 记录并完成验证（使用管理 Google Cloud 项目的同一个账号）
-  2. GitHub 仓库 Settings → Pages：Deploy from a branch，`main` / `/docs`，Custom domain 填 `snacknodes.linksluckytime.com`，证书签发后勾选 Enforce HTTPS
-  3. Google Cloud「品牌塑造」：首页 `https://snacknodes.linksluckytime.com/`，隐私政策 `https://snacknodes.linksluckytime.com/privacy.html`，已获授权的网域 `linksluckytime.com`；然后在验证弹窗选「我已解决相关问题」（如提示需等 24 小时则隔天提交）
-  4. 全部通过后可删除 `claude/stoic-fermat-wano83` 分支（在此之前旧隐私政策链接仍指向它）
+- **项目主页与 Google 品牌验证（2026-11-01 完成）**：Google 修改品牌信息时要求品牌验证，`github.com` 无法证明归属，于是改用项目方自己的域名。主页 `https://snacknodes.linksluckytime.com/`，隐私政策 `https://snacknodes.linksluckytime.com/privacy.html`，由 GitHub Pages 托管 `docs/` 目录（`main` / `/docs`，`docs/CNAME`）。域名 `linksluckytime.com` 已在 Search Console 验证；**Google OAuth 品牌已验证并发布**，用户授权时会看到应用名称「ComfyUI SnackNodes」
+  - DNS 里的 TXT 记录（`google-site-verification=...`）和 CNAME（`snacknodes` → `svbmwjwj.github.io`）要一直保留，删掉会导致验证失效或主页打不开
+  - 名称约定：Registry 节点 ID 和 GitHub 仓库名固定为 `comfyui_snacknodes`；Google 应用名称 `ComfyUI SnackNodes`，主页标题与之一致（品牌验证会核对）；品牌名 SnackNodes
+  - 开发分支 `claude/stoic-fermat-wano83` 已不再被任何外部链接引用，可以删除
 - 要从 Registry 真正下架或弃用旧版本，需要在 registry.comfy.org 的发布者后台手动操作
 
 ## 后续可能要做的
+
+- **下次发版时一起改**：`pyproject.toml` 的 `DisplayName`（Registry 页面显示的名字）从 `comfyui_snacknodes` 改为 `SnackNodes` 或 `ComfyUI SnackNodes`；节点 ID `name = "comfyui_snacknodes"` 不变。单独改 `pyproject.toml` 会在合并时触发发布，所以和版本号（如 2.0.1）一起改
+- **修复 `validate`（node-diff）检查**：它不安装依赖就加载 base 分支的 `__init__.py`，目前因顶层导入 numpy/PIL/requests/cryptography 而必定失败。办法是把这些依赖改为按需导入（已在 PR #2 留言说明）
 
 - 做一个 Comfy Cloud 同步工具：在节点外部运行，通过 Comfy Cloud API v2（`GET /api/v2/assets/{id}/content`）下载生成结果，再上传到网盘或保险库。注意结果有 `expires_at` 过期时间
 - iCloud（非官方接口，国际账号）
