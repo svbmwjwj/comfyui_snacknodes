@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy / 隐私政策 · ComfyUI SnackNodes</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body><main>
+
+<header>
+  <div class="tag"><a href="./">ComfyUI SnackNodes</a> · comfyui-snacknodes</div>
+  <h1>Privacy Policy<br><span>隐私政策</span></h1>
+  <p class="lang">Last updated / 最后更新：2026-11-01</p>
+</header>
+
+<p>ComfyUI SnackNodes ("Save to Cloud Drive", comfyui-snacknodes) is an open-source ComfyUI custom node.
+It runs entirely on the machine where you run ComfyUI. The developers operate <strong>no servers</strong> and receive <strong>no data</strong> from you.</p>
+
+<h2>What the app accesses</h2>
+<ul>
+  <li><strong>Google Drive, scope <code>drive.file</code> only.</strong> The app can see and change only the files and folders it created itself. It cannot read, list or modify any other file in your Google Drive.</li>
+  <li>It uses this access solely to create folders and upload the files you choose to save from ComfyUI (images, videos, other output files) into <strong>your own</strong> Google Drive, and, when you use encryption, to read the Cryptomator vault files it created there.</li>
+  <li>WebDAV servers and Aliyun Drive are accessed the same way, only to upload the files you choose.</li>
+</ul>
+
+<h2>Where data is stored</h2>
+<ul>
+  <li>OAuth tokens and, if you enable encryption, the unlocked vault keys are stored only on your machine, in <code>~/.config/comfyui_snacknodes/cloud_drive.json</code> (file mode 600). They are never written into workflows and never sent anywhere except to the storage provider's official API.</li>
+  <li>Your files go directly from your machine to your storage. With encryption enabled they are encrypted on your machine before upload.</li>
+  <li>Vault passwords are never stored.</li>
+</ul>
+
+<h2>Sharing</h2>
+<p>No data is sold, shared with, or transferred to the developers or any third party. There is no analytics, telemetry or advertising.</p>
+
+<h2>Google API Services User Data Policy</h2>
+<p>The app's use and transfer of information received from Google APIs adheres to the
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+<h2>Deleting your data / revoking access</h2>
+<ul>
+  <li>Run <code>python auth.py logout google_drive</code> to delete the stored tokens and vault keys from your machine.</li>
+  <li>Revoke the app's access at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+  <li>Files the app uploaded stay in your Drive under your control; delete them like any other file.</li>
+</ul>
+
+<h2>Contact</h2>
+<p>Open an issue at <a href="https://github.com/svbmwjwj/comfyui_snacknodes/issues">github.com/svbmwjwj/comfyui_snacknodes/issues</a>.</p>
+
+<h2>中文摘要</h2>
+<ul>
+  <li>本工具完全在你运行 ComfyUI 的机器上运行，开发者<strong>没有任何服务器</strong>，也<strong>收不到你的任何数据</strong>。</li>
+  <li>Google Drive 只申请 <code>drive.file</code> 权限：只能看到和修改本工具自己创建的文件和文件夹，用途仅限把你选择保存的文件上传到<strong>你自己的</strong> Drive，以及读取它自己创建的加密保险库文件。</li>
+  <li>授权凭据和保险库密钥只保存在你本机的 <code>~/.config/comfyui_snacknodes/cloud_drive.json</code>（权限 600），不写入工作流；保险库密码不保存。</li>
+  <li>不出售、不共享数据，没有统计、遥测或广告。对 Google API 数据的使用遵守 Google API Services User Data Policy（包括 Limited Use 要求）。</li>
+  <li>撤销授权：在本机运行 <code>auth.py logout google_drive</code>，或在 <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> 移除本应用。</li>
+  <li>问题反馈：<a href="https://github.com/svbmwjwj/comfyui_snacknodes/issues">GitHub Issues</a>。</li>
+</ul>
+
+<footer><a href="./">← ComfyUI SnackNodes</a></footer>
+</main></body>
+</html>

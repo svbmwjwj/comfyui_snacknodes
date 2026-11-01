@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ComfyUI SnackNodes · Save to Cloud Drive / 保存到网盘</title>
+<meta name="description" content="ComfyUI SnackNodes (comfyui-snacknodes): a ComfyUI custom node that saves your generated images and videos to your own Google Drive or WebDAV storage, optionally end-to-end encrypted.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body><main>
+
+<header>
+  <div class="tag">ComfyUI custom node · comfyui-snacknodes</div>
+  <h1>ComfyUI SnackNodes<br><span>Save to Cloud Drive · 保存到网盘</span></h1>
+  <p class="lead">把 ComfyUI 生成的图片和视频直接存进<strong>你自己的网盘</strong>，可选端到端加密。适合在 AutoDL 等云端 GPU 上运行 ComfyUI 的个人用户。</p>
+  <p class="lead lang">Save the images and videos you generate in ComfyUI straight to <strong>your own</strong> Google Drive or WebDAV storage, optionally end-to-end encrypted.</p>
+  <div class="btns">
+    <a href="https://github.com/svbmwjwj/comfyui_snacknodes">GitHub</a>
+    <a class="alt" href="privacy.html">隐私政策 / Privacy Policy</a>
+  </div>
+</header>
+
+<h2>功能 / Features</h2>
+<div class="grid">
+  <div class="card"><b>Google Drive · WebDAV · 阿里云盘</b><p>WebDAV 覆盖坚果云、Nextcloud、NAS、OpenList。<br>WebDAV covers Nutstore, Nextcloud, NAS, OpenList.</p></div>
+  <div class="card"><b>端到端加密 / End-to-end encryption</b><p>Cryptomator 保险库格式，官方 App 直接打开。<br>Cryptomator vault format; open with the official app.</p></div>
+  <div class="card"><b>按日期归档 / Date folders</b><p>默认 <code>ComfyUI/%date:yyyy-MM-dd%</code></p></div>
+  <div class="card"><b>进度条 · 不覆盖 / Progress · no overwrite</b><p>实时进度；同名文件自动改名。<br>Live progress; existing files are never overwritten.</p></div>
+  <div class="card"><b>自动化 / Automation</b><p>「成功」布尔输出，可选失败时不中断。<br>A success output; optionally keep going on failure.</p></div>
+  <div class="card"><b>凭据只在本机 / Local credentials</b><p>凭据不写进工作流，分享工作流也安全。<br>Credentials never go into workflows.</p></div>
+</div>
+
+<h2>界面 / Screenshots</h2>
+<p><img class="shot" src="assets/node-progress.jpg" alt="Upload in progress"></p>
+<p><img class="shot" src="assets/node-encrypted.jpg" alt="Encrypted upload finished"></p>
+
+<h2>Google 用户数据的使用 / How Google user data is used</h2>
+<p>授权 Google Drive 时，本工具只申请 <code>drive.file</code> 权限：只能看到和修改<strong>它自己创建的</strong>文件和文件夹，用于把你选择保存的文件上传到你自己的 Google Drive。它读不到你 Drive 里的其他任何内容。工具完全在你运行 ComfyUI 的机器上运行，开发者没有服务器，收不到你的任何数据。</p>
+<p class="lang">When you authorize Google Drive, the app requests only the <code>drive.file</code> scope: it can see and change only the files and folders it created itself, and uses this solely to upload the files you choose to save into your own Google Drive. It cannot read anything else in your Drive. The app runs entirely on the machine where you run ComfyUI; the developers operate no servers and receive no data. Details: <a href="privacy.html">Privacy Policy</a>.</p>
+
+<h2>开始使用 / Get started</h2>
+<p>在 ComfyUI Manager 中搜索 <code>snacknodes</code>，或者手动安装：<span class="lang">Search for <code>snacknodes</code> in ComfyUI Manager, or install manually:</span></p>
+<pre>cd ComfyUI/custom_nodes
+git clone https://github.com/svbmwjwj/comfyui_snacknodes
+pip install -r comfyui_snacknodes/requirements.txt
+
+# 授权一次 / authorize once (from the ComfyUI folder)
+python custom_nodes/comfyui_snacknodes/auth.py google_drive</pre>
+<p>完整说明见 <a href="https://github.com/svbmwjwj/comfyui_snacknodes#readme">README</a>。<span class="lang">Full documentation: README.</span></p>
+
+<footer>
+  ComfyUI SnackNodes (comfyui-snacknodes) · 开源 / open source ·
+  <a href="privacy.html">Privacy Policy / 隐私政策</a> ·
+  问题反馈 / Contact: <a href="https://github.com/svbmwjwj/comfyui_snacknodes/issues">GitHub Issues</a>
+</footer>
+
+</main></body>
+</html>
