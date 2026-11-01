@@ -64,6 +64,8 @@
 
 ## 合并前注意
 
+- **（2026-11-01 决定）先不发布，等阿里云盘也做好、测好后一起发布。** 在此之前不要合并到 main：合并后 `publish_action.yml` 会自动发布。发布时再决定两个发布流程保留哪一个
+
 - **隐私政策链接**：Google 同意屏幕里的链接现在指向 `blob/claude/stoic-fermat-wano83/PRIVACY.md`，合并后要改成 `blob/main/PRIVACY.md`，否则删除分支后链接会失效
 
 - 合并到 main 后，`publish_action.yml` 会自动把 2.0.0 发布到 Comfy Registry，发布后旧节点会消失
