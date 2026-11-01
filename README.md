@@ -37,7 +37,7 @@ python custom_nodes/comfyui_snacknodes/auth.py google_drive
 ```
 
 - 文件上传到**你自己的 Google Drive**，占用你自己的空间。本项目内置的 OAuth 客户端只用来标识这个应用，本身访问不了任何人的 Drive。
-- 只申请 `drive.file` 权限：本工具**只能看到它自己创建的文件和文件夹**，读不到你 Drive 里的其他任何内容。
+- 只申请 `drive.file` 权限：本工具**只能看到它自己创建的文件和文件夹**，读不到你 Drive 里的其他任何内容。详见[隐私政策](PRIVACY.md)。
 
 <details>
 <summary>进阶：使用你自己的 OAuth 客户端</summary>
