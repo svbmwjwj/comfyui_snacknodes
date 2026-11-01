@@ -8,8 +8,3 @@ recursive-exclude * *.py[co]
 
 recursive-include docs *.rst conf.py Makefile make.bat *.jpg *.png *.gif
 
-graft web
-
-recursive-include nodes *.py
-recursive-include utils *.py
-recursive-include config *.py

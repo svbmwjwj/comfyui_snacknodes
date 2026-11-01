@@ -1,26 +1,10 @@
-"""ComfyUI SnackNodes package."""
+"""ComfyUI SnackNodes package.
 
-# Import nodes
-from .nodes.images.image_info import ImageInfo
-from .nodes.images.image_scaler import ImageScaler
-from .nodes.feature.text_box import TextBox
-from .nodes.feature.text_processor import TextProcessor
+All previous nodes (Image Info, Image Scaler, Text Box, Text Processor) have been
+retired in favour of ComfyUI core nodes. See README.md for replacements.
+"""
 
-NODE_CLASS_MAPPINGS = {
-    "ImageInfo": ImageInfo,
-    "ImageScaler": ImageScaler,
-    "TextBox": TextBox,
-    "TextProcessor": TextProcessor,
-}
+NODE_CLASS_MAPPINGS = {}
+NODE_DISPLAY_NAME_MAPPINGS = {}
 
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageInfo": "Image Info 🍿",
-    "ImageScaler": "Image Scaler 🍿",
-    "TextBox": "Text Box 🍿",
-    "TextProcessor": "Text Processor 🍿",
-}
-
-WEB_DIRECTORY = "web"
-
-# Export node mappings
-__all__ = ["ImageInfo", "ImageScaler", "TextBox", "TextProcessor"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

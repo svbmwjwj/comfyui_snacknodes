@@ -12,12 +12,7 @@ authors = [
 ]
 readme = "README.md"
 license = {text = "GNU General Public License v3"}
-dependencies = [
-    "torch",
-    "numpy",
-    "pillow",
-    "opencv-python-headless"
-]
+dependencies = []
 
 [project.urls]
 Repository = "https://github.com/svbmwjwj/comfyui_snacknodes"
