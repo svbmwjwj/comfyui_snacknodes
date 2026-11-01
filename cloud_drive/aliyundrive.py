@@ -14,7 +14,7 @@ from typing import Any, Callable, Optional
 
 import requests
 
-from .base import AuthRequired, CloudDriveError, Provider, request
+from .base import AuthRequired, CloudDriveError, Progress, Provider, request
 from .config import CredentialStore
 
 NAME = "aliyundrive"
@@ -168,7 +168,8 @@ class AliyunDrive(Provider):
 
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
-                    allow_rename: bool = True) -> tuple[str, str, Optional[str]]:
+                    allow_rename: bool = True,
+                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
         size = os.path.getsize(local_path)
         part_size = max(PART_SIZE, math.ceil(size / MAX_PARTS))
         n_parts = max(1, math.ceil(size / part_size))
@@ -191,6 +192,10 @@ class AliyunDrive(Provider):
                         issued = self.clock()
                     f.seek((number - 1) * part_size)
                     self._put_part(drive_id, file_id, upload_id, number, urls, f.read(part_size))
+                    if progress:
+                        progress(min(number * part_size, size), size)
+        if progress:
+            progress(size, size)  # also covers rapid (hash-matched) uploads
         done = self._post("/adrive/v1.0/openFile/complete",
                           {"drive_id": drive_id, "file_id": file_id, "upload_id": upload_id})
         return file_id, done.get("name", created.get("file_name", name)), None

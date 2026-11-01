@@ -27,13 +27,17 @@ class LocalProvider(Provider):
         os.makedirs(self._abs(rel), exist_ok=True)
         return rel
 
-    def upload_file(self, parent_id, name, local_path, mime_type="application/octet-stream", allow_rename=True):
+    def upload_file(self, parent_id, name, local_path, mime_type="application/octet-stream", allow_rename=True,
+                    progress=None):
         rel = os.path.join(parent_id, name) if parent_id else name
         if os.path.exists(self._abs(rel)):
             if not allow_rename:
                 raise CloudDriveError("exists")
             raise AssertionError("tests never upload duplicates")
         shutil.copyfile(local_path, self._abs(rel))
+        if progress:
+            size = os.path.getsize(local_path)
+            progress(size, size)
         return rel, name, None
 
     def download(self, file_id):

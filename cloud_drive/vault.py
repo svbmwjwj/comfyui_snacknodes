@@ -11,7 +11,7 @@ import tempfile
 from typing import Optional
 
 from . import cryptomator as cm
-from .base import CloudDriveError, Provider, UploadResult, split_folder
+from .base import CloudDriveError, Progress, Provider, UploadResult, split_folder
 from .config import CredentialStore
 
 AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py vault-create (or vault-unlock)"
@@ -125,7 +125,8 @@ class CryptomatorVault:
             self._dir_ids[key] = dir_id
         return dir_id
 
-    def upload(self, local_path: str, clear_folder: str, clear_name: Optional[str] = None) -> UploadResult:
+    def upload(self, local_path: str, clear_folder: str, clear_name: Optional[str] = None,
+               progress: Optional[Progress] = None) -> UploadResult:
         dir_id = self.ensure_dir(clear_folder)
         folder = self._content_dir(dir_id)
         base = clear_name or os.path.basename(local_path)
@@ -144,9 +145,10 @@ class CryptomatorVault:
             if short:
                 node_id = self.provider.create_folder(folder, node)
                 self._upload_bytes(node_id, "name.c9s", cm.encrypt_name(self.keys, name, dir_id).encode())
-                file_id = self.provider.upload_file(node_id, "contents.c9r", tmp, allow_rename=False)[0]
+                file_id = self.provider.upload_file(node_id, "contents.c9r", tmp, allow_rename=False,
+                                                    progress=progress)[0]
             else:
-                file_id = self.provider.upload_file(folder, node, tmp, allow_rename=False)[0]
+                file_id = self.provider.upload_file(folder, node, tmp, allow_rename=False, progress=progress)[0]
         finally:
             os.unlink(tmp)
         clear = "/".join(split_folder(self.vault_path) + split_folder(clear_folder) + [name])

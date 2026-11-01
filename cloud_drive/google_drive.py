@@ -16,7 +16,7 @@ from typing import Any, Callable, Optional
 
 import requests
 
-from .base import AuthRequired, CloudDriveError, Provider, request
+from .base import AuthRequired, CloudDriveError, Progress, Provider, request
 from .config import CredentialStore
 
 NAME = "google_drive"
@@ -167,7 +167,8 @@ class GoogleDrive(Provider):
 
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
-                    allow_rename: bool = True) -> tuple[str, str, Optional[str]]:
+                    allow_rename: bool = True,
+                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
         # Drive allows duplicate names, so the name is always kept as given.
         size = os.path.getsize(local_path)
         init = request(
@@ -188,6 +189,8 @@ class GoogleDrive(Provider):
                 resp = request(self.session, "PUT", session_url, data=chunk, ok=(200, 201, 308),
                                headers={"Content-Range": content_range}, sleep=self.sleep)
                 if resp.status_code in (200, 201):
+                    if progress:
+                        progress(size, size)
                     body = resp.json()
                     return body["id"], body.get("name", name), body.get("webViewLink")
                 if not chunk:
@@ -195,3 +198,5 @@ class GoogleDrive(Provider):
                 # 308: the server reports how much it has; resume from there
                 received = resp.headers.get("Range")
                 offset = int(received.rsplit("-", 1)[1]) + 1 if received else 0
+                if progress:
+                    progress(offset, size)

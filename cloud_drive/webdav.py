@@ -16,7 +16,7 @@ from urllib.parse import quote, urlsplit
 
 import requests
 
-from .base import DEFAULT_TIMEOUT, RETRY_STATUS, AuthRequired, CloudDriveError, Provider, request
+from .base import DEFAULT_TIMEOUT, RETRY_STATUS, AuthRequired, CloudDriveError, Progress, Provider, request
 from .config import CredentialStore
 
 NAME = "webdav"
@@ -40,6 +40,23 @@ def is_insecure_url(url: str) -> bool:
     """Plain http to anything but the local machine sends the password in clear text."""
     parts = urlsplit(url)
     return parts.scheme == "http" and parts.hostname not in ("localhost", "127.0.0.1", "::1")
+
+
+class _CountingReader:
+    """File wrapper that reports how much requests has read (= sent) so far."""
+
+    def __init__(self, f, size: int, progress: Optional[Progress]):
+        self.f, self.size, self.progress, self.sent = f, size, progress, 0
+
+    def read(self, n: int = -1) -> bytes:
+        chunk = self.f.read(n)
+        self.sent += len(chunk)
+        if self.progress and chunk:
+            self.progress(self.sent, self.size)
+        return chunk
+
+    def __len__(self) -> int:
+        return self.size
 
 
 class WebDAV(Provider):
@@ -123,7 +140,8 @@ class WebDAV(Provider):
 
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
-                    allow_rename: bool = True) -> tuple[str, str, Optional[str]]:
+                    allow_rename: bool = True,
+                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
         final = name
         if self.find_child(parent_id, name):
             if not allow_rename:
@@ -141,7 +159,7 @@ class WebDAV(Provider):
             try:
                 with open(local_path, "rb") as f:
                     resp = self.session.request(
-                        "PUT", url, data=f, auth=auth, timeout=DEFAULT_TIMEOUT,
+                        "PUT", url, data=_CountingReader(f, size, progress), auth=auth, timeout=DEFAULT_TIMEOUT,
                         headers={"Content-Type": mime_type, "Content-Length": str(size)})
             except requests.RequestException as e:
                 last = e

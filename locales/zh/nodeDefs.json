@@ -1,7 +1,7 @@
 {
   "SnackSaveToCloudDrive": {
-    "display_name": "保存到网盘 (Save to Cloud Drive)",
-    "description": "把图片、视频或已有文件上传到你自己的网盘，可选端到端加密。\n\n一次性设置（在运行 ComfyUI 的机器的终端里执行）：\n  python custom_nodes/comfyui_snacknodes/auth.py google_drive\n  python custom_nodes/comfyui_snacknodes/auth.py webdav --url 地址 --username 用户名\n  python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   （仅加密时需要）\n凭据只保存在这台机器上，不会写进工作流。\n\n用法\n- 连上 图像 和/或 视频，选择网盘。\n- 网盘目录：不存在会自动创建，支持日期变量：\n  ComfyUI/%date:yyyy-MM-dd%  →  ComfyUI/2026-11-01\n  ComfyUI/%year%/%month%     →  ComfyUI/2026/11\n- 加密选 Cryptomator vault：文件内容和文件名在上传前就加密，用 Cryptomator App 打开。\n- 预览：运行后在节点上显示图片，不需要可以关掉。\n- 高级选项：文件名前缀、保留本地副本 控制本机保存的副本。\n- 额外上传文件（输入接口）：连一个文本节点，列出 output 目录里已有的文件，一行一个，例如 video/ComfyUI_00001_.mp4\n网盘上的同名文件不会被覆盖，会自动改名为 名字_1、名字_2……",
+    "display_name": "保存到网盘",
+    "description": "把图片、视频或已有文件上传到你自己的网盘，可选端到端加密。\n\n一次性设置（在运行 ComfyUI 的机器的终端里执行）：\n  python custom_nodes/comfyui_snacknodes/auth.py google_drive\n  python custom_nodes/comfyui_snacknodes/auth.py webdav --url 地址 --username 用户名\n  python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   （仅加密时需要）\n凭据只保存在这台机器上，不会写进工作流。\n\n用法\n- 连上 图像 和/或 视频，选择网盘。\n- 网盘目录：不存在会自动创建，支持日期变量：\n  ComfyUI/%date:yyyy-MM-dd%  →  ComfyUI/2026-11-01\n  ComfyUI/%year%/%month%     →  ComfyUI/2026/11\n- 加密：文件内容和文件名在上传前就加密（Cryptomator 保险库格式），用 Cryptomator App 打开。\n- 预览：运行后在节点上显示图片，不需要可以关掉。\n- 保留本地副本：文件同时保留在 ComfyUI 的 output 目录。\n- 高级：文件名前缀（本地文件名）；失败时停止 关掉后，上传失败不会中断工作流，而是输出 成功 = false。\n- 额外上传文件（输入接口）：连一个文本节点，列出 output 目录里已有的文件，一行一个，例如 video/ComfyUI_00001_.mp4\n- 输出：上传结果（每个文件一行）和 成功（true/false），方便做自动化。\n上传时节点上会显示进度条和当前文件；网盘上的同名文件不会被覆盖，会自动改名为 名字_1、名字_2……",
     "inputs": {
       "provider": {
         "name": "网盘",
@@ -11,21 +11,25 @@
         "name": "网盘目录",
         "tooltip": "网盘上的目录（开启加密时是保险库里的目录），不存在会自动创建。支持日期变量：%date:yyyy-MM-dd%、%year%、%month%、%day%、%hour%、%minute%、%second%（服务器本地时间）。例如 ComfyUI/%date:yyyy-MM%"
       },
-      "encryption": {
+      "encrypt": {
         "name": "加密",
-        "tooltip": "选 Cryptomator vault 时，文件内容和文件名在上传前就加密，用 Cryptomator App 打开。保险库用 auth.py vault-create 创建一次即可。"
+        "tooltip": "上传前加密文件内容和文件名（Cryptomator 保险库格式），用 Cryptomator App 打开。保险库用 auth.py vault-create 创建一次即可。"
       },
       "preview": {
         "name": "预览",
         "tooltip": "运行后在节点上显示保存的图片。"
       },
+      "keep_local_copy": {
+        "name": "保留本地副本",
+        "tooltip": "开：文件同时保留在 ComfyUI 的 output 目录。关：只放在临时目录（ComfyUI 重启后清空）。"
+      },
       "filename_prefix": {
         "name": "文件名前缀",
         "tooltip": "保存的图片/视频的文件名前缀，和 Save Image 节点一样，可以带子目录，例如 portraits/ComfyUI"
       },
-      "keep_local_copy": {
-        "name": "保留本地副本",
-        "tooltip": "开：文件同时保留在 ComfyUI 的 output 目录。关：只放在临时目录（ComfyUI 重启后清空）。"
+      "stop_on_error": {
+        "name": "失败时停止",
+        "tooltip": "开：上传失败时报错并停止工作流。关：继续运行，成功 输出为 false（用于自动化）。"
       },
       "images": {
         "name": "图像",
@@ -44,6 +48,10 @@
       "0": {
         "name": "上传结果",
         "tooltip": "每个文件一行：网盘提供分享链接时是链接，否则是 网盘:路径。"
+      },
+      "1": {
+        "name": "成功",
+        "tooltip": "所有文件都上传成功时为 true。关闭 失败时停止 后，上传失败会输出 false 而不是中断工作流，可用于分支判断。"
       }
     }
   }

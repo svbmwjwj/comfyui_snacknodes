@@ -11,6 +11,9 @@ import requests
 DEFAULT_TIMEOUT = (15, 120)  # (connect, read) seconds
 RETRY_STATUS = {429, 500, 502, 503, 504}
 
+# progress(bytes_sent, total_bytes) for the payload of one upload
+Progress = Callable[[int, int], None]
+
 
 class CloudDriveError(RuntimeError):
     """Raised when a cloud drive operation fails."""
@@ -96,9 +99,11 @@ class Provider:
 
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
-                    allow_rename: bool = True) -> tuple[str, str, Optional[str]]:
+                    allow_rename: bool = True,
+                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
         """Upload; returns (file_id, final_name, share_url_or_None).
-        allow_rename=False must fail rather than store under a different name."""
+        allow_rename=False must fail rather than store under a different name.
+        progress, if given, is called with (bytes_sent, total_bytes) as the upload advances."""
         raise NotImplementedError
 
     def download(self, file_id: str) -> bytes:
@@ -132,9 +137,9 @@ class Provider:
         return current
 
     def upload(self, local_path: str, remote_folder: str, remote_name: Optional[str] = None,
-               mime_type: str = "application/octet-stream") -> UploadResult:
+               mime_type: str = "application/octet-stream", progress: Optional[Progress] = None) -> UploadResult:
         import os
         parent = self.ensure_folder(remote_folder)
         file_id, final_name, url = self.upload_file(
-            parent, remote_name or os.path.basename(local_path), local_path, mime_type)
+            parent, remote_name or os.path.basename(local_path), local_path, mime_type, progress=progress)
         return UploadResult(self.name, "/".join(split_folder(remote_folder) + [final_name]), file_id, url)
