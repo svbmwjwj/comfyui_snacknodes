@@ -107,7 +107,7 @@
 - **版本号**：Registry 上当前是 v1.0.1（用户确认，2026-11-01）；本次发布用 2.0.0（删除旧节点属于不兼容改动）
 - **发布密钥**：仓库只跑过一次发布流程（2026-05-05，失败），很可能缺少 `REGISTRY_ACCESS_TOKEN`。配置方法：在 registry.comfy.org 的发布者 svbmwjwj 页面创建 API Key，再到 GitHub 仓库 Settings → Secrets and variables → Actions → New repository secret，名称填 `REGISTRY_ACCESS_TOKEN`
 
-- **（2026-11-01 决定）先不发布，等阿里云盘也做好、测好后一起发布。** 在此之前不要合并到 main：合并后 `publish_action.yml` 会自动发布。
+- **合并即发布**：Google Drive、WebDAV 和界面都已测完（阿里云盘因开放平台不再接受个人开发者，改为可选）。合并到 main 就会自动发布 2.0.0，合并前确认 `REGISTRY_ACCESS_TOKEN` 已配好。
 - **隐私政策链接**：Google 同意屏幕里的链接现在指向 `blob/claude/stoic-fermat-wano83/PRIVACY.md`，合并后要改成 `blob/main/PRIVACY.md`，否则删除分支后链接会失效
 
 - 合并到 main 后，`publish_action.yml` 会自动把 2.0.0 发布到 Comfy Registry，发布后旧节点会消失
