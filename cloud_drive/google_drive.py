@@ -33,8 +33,8 @@ CHUNK_SIZE = 32 * 256 * 1024  # 8 MiB, must be a multiple of 256 KiB
 # Built-in OAuth client ("TVs and Limited Input devices", published to production).
 # For installed/device apps Google does not treat the client secret as confidential:
 # it only identifies the app and grants no access to anyone's Drive by itself.
-BUILTIN_CLIENT_ID = ""
-BUILTIN_CLIENT_SECRET = ""
+BUILTIN_CLIENT_ID = "394500357791-5lu827rsdh8d83his7jnpulgcgt0930f.apps.googleusercontent.com"
+BUILTIN_CLIENT_SECRET = "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"
 
 
 def resolve_client(client_id: Optional[str] = None,
