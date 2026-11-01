@@ -27,12 +27,16 @@
 - 35 个自动化测试全部通过（`pytest`），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
+- **Google Drive 实测通过（2026-11-01）**：
+  - 设备码授权成功。首次授权报"尚未完成 Google 验证流程"（403 access_denied），原因是同意屏幕处于"测试中"，且账号不在测试用户名单里；把账号加为测试用户（或发布为正式版）后就能通过，代码不用改
+  - 普通上传：通过节点上传 1 张 PNG（804 B，带 prompt 元数据）和 1 个 MP4（15.2 MB，按 8 MiB 分块，共 2 块，走断点续传），都返回了分享链接；下载回来逐字节一致，md5 与 Drive 记录的相同，MIME 类型正确，目录 `ComfyUI-Test/plain` 自动创建
+  - 再次上传到同一目录：沿用已有文件夹，不会重复建；同名文件会多出一份（Drive 允许重名，这是预期行为）
+  - 加密上传：`vault-create` 在 Drive 上建了 `ComfyUI-Vault-Test`，通过节点上传到 `ComfyUI/enc-test`；把整个保险库下载到本地后，用官方 `cryptofs` 解密，目录结构和两个文件的 SHA-256 都与原文件一致
 
 ## 还没验证（待测试）
 
 | 项目 | 阻碍 | 需要准备什么 |
 |---|---|---|
-| Google Drive 真实授权和上传 | 无，当前环境能连上 Google | 一个测试用的 OAuth 客户端（类型选"电视和受限输入设备"，同意屏幕设为"正式版"），提供 client ID 和 secret |
 | 阿里云盘真实授权和上传 | 环境网络策略拦截了相关域名 | 在环境设置里放行 `openapi.alipan.com`、`*.aliyundrive.net`、`*.alipan.com`；准备开放平台应用的 client_id 和 secret |
 | 阿里云盘扫码授权接口 | 官方文档（语雀）在当前环境打不开，OpenList 源码里也没有这个接口 | 实测时验证；失败就改用 `--refresh-token` |
 | 用 Cryptomator App 打开 Google Drive 上的保险库 | 需要真机 | 在手机上安装 Cryptomator，添加 Google Drive |
@@ -49,10 +53,7 @@
 
 ## 测试步骤（准备好后照做）
 
-1. **Google Drive**：运行 `python auth.py google_drive --client-id … --client-secret …`，在手机上输入验证码
-   - 普通上传：上传一张图片和一个视频，检查返回的分享链接
-   - 加密上传：运行 `auth.py vault-create google_drive --path ComfyUI-Vault-Test`，用节点逻辑上传，再用手机 Cryptomator 打开核对
-   - 测完：删除测试用的 OAuth 客户端，执行 `auth.py logout google_drive`
+1. **Google Drive**：✅ 已完成（见"已验证"）。还剩两项：用手机 Cryptomator 打开 `ComfyUI-Vault-Test` 核对；测完后删除测试用的 OAuth 客户端，并执行 `auth.py logout google_drive`
 2. **阿里云盘**：放行域名之后，按同样的流程测一遍，另外测一次 `vault-unlock` 解锁已有保险库
 3. **ComfyUI 实机**：确认节点能出现在节点列表里，并跑通一次"生成图片 → 上传"
 
