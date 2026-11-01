@@ -112,7 +112,11 @@
 - ~~合并即发布~~（已完成）：Google Drive、WebDAV 和界面都已测完（阿里云盘因开放平台不再接受个人开发者，改为可选）。合并到 main 就会自动发布 2.0.0，合并前确认 `REGISTRY_ACCESS_TOKEN` 已配好。
 - **隐私政策链接**：Google 同意屏幕里的链接现在指向 `blob/claude/stoic-fermat-wano83/PRIVACY.md`，合并后要改成 `blob/main/PRIVACY.md`，否则删除分支后链接会失效
 
-- **发布后待办（需项目方操作）**：在 Google Cloud OAuth 同意屏幕把隐私政策链接改为 `https://github.com/svbmwjwj/comfyui_snacknodes/blob/main/PRIVACY.md`
+- **项目主页（2026-11-01）**：Google 修改品牌信息时要求品牌验证，`github.com` 无法证明归属，所以改用项目方自己的域名 `snacknodes.linksluckytime.com`，用 GitHub Pages 托管 `docs/`（`index.html`、`privacy.html`、`CNAME`、`.nojekyll`）。需项目方操作：
+  1. DNS：添加 CNAME `snacknodes` → `svbmwjwj.github.io`；在 Google Search Console 添加「网域」资源 `linksluckytime.com`，按提示加 TXT 记录并完成验证（使用管理 Google Cloud 项目的同一个账号）
+  2. GitHub 仓库 Settings → Pages：Deploy from a branch，`main` / `/docs`，Custom domain 填 `snacknodes.linksluckytime.com`，证书签发后勾选 Enforce HTTPS
+  3. Google Cloud「品牌塑造」：首页 `https://snacknodes.linksluckytime.com/`，隐私政策 `https://snacknodes.linksluckytime.com/privacy.html`，已获授权的网域 `linksluckytime.com`；然后在验证弹窗选「我已解决相关问题」（如提示需等 24 小时则隔天提交）
+  4. 全部通过后可删除 `claude/stoic-fermat-wano83` 分支（在此之前旧隐私政策链接仍指向它）
 - 要从 Registry 真正下架或弃用旧版本，需要在 registry.comfy.org 的发布者后台手动操作
 
 ## 后续可能要做的

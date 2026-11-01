@@ -4,6 +4,8 @@
 
 适合在 AutoDL 等租卡平台、或任何远程 GPU 服务器上运行 ComfyUI 的个人用户。
 
+主页：<https://snacknodes.linksluckytime.com> · [隐私政策](https://snacknodes.linksluckytime.com/privacy.html)
+
 ## 功能
 
 - 接收 `images`、`video`，或 output 目录中已有文件的路径（`file_paths`，一行一个）
