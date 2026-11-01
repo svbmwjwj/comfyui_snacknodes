@@ -47,9 +47,9 @@ class CryptomatorVault:
         mk_id = provider.find_path(vault_path + "/" + cm.MASTERKEY_FILE)
         cfg_id = provider.find_path(vault_path + "/" + cm.VAULT_CONFIG_FILE)
         if not (mk_id and cfg_id):
-            raise CloudDriveError(
-                f"No Cryptomator vault found at {vault_path}. (Google Drive can only see vaults "
-                f"created by this tool; create one with vault-create.)")
+            hint = (" Google Drive can only see vaults created by this tool; create one with vault-create."
+                    if provider.name == "google_drive" else " Check the path (it is case-sensitive).")
+            raise CloudDriveError(f"No Cryptomator vault found at {vault_path}.{hint}")
         keys = cm.unlock_masterkey_file(provider.download(mk_id), password)
         cm.verify_vault_config(provider.download(cfg_id), keys)
         return cls(provider, vault_path, keys)

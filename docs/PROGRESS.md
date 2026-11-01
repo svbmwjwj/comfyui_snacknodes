@@ -32,13 +32,22 @@
 
 ## 已验证
 
-- 51 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
+- 52 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
-- **WebDAV 本地实测通过（2026-11-01，WsgiDAV 4.4 服务端，Basic 认证）**：
-  - `auth.py webdav` 会先测试连接：密码错误时给出友好提示（并提醒坚果云要用应用密码），正确时才保存
-  - 通过节点上传图片和 15 MB 视频到 `ComfyUI/测试 目录/%date:yyyy-MM%`：中文、空格、日期变量都正确，内容逐字节一致；同名文件自动改为 `_1`，不会覆盖
-  - 加密：本工具通过 WebDAV 建的保险库，官方 `cryptofs` 解密后 SHA-256 一致；`cryptofs` 建的保险库，本工具通过 WebDAV `vault-unlock` 后继续写入，官方仍能读出全部文件（含原有的 `hello.txt`）
+- **WebDAV 实测通过（2026-11-01）**，测了 4 种服务端实现，每种都跑同一套流程（脚本流程：连接测试 → 明文上传两次 → 新建保险库并加密上传 → 解锁官方 cryptofs 建的保险库并继续写入；保险库都通过 WebDAV 下载回来，交给官方 `cryptofs` 校验 SHA-256）：
+
+  | 服务端 | 代表的真实场景 | 结果 |
+  |---|---|---|
+  | WsgiDAV 4.4（Python） | 通用 | ✅ |
+  | Nextcloud（Docker 官方镜像，sabre/dav，使用应用密码） | Nextcloud / ownCloud | ✅ |
+  | Apache 2.4 mod_dav | 群晖等 NAS 自带的 WebDAV、自建服务器 | ✅ |
+  | rclone serve webdav（Go `x/net/webdav`） | OpenList / AList（同一套 Go WebDAV 库） | ✅ |
+
+  - 每种都验证了：密码错误时有友好提示；中文、空格目录和日期变量正常；同名文件自动改为 `_1`、不覆盖；内容逐字节一致；两个方向的保险库互通
+  - 1 GB 文件流式上传（rclone）：7.6 秒，进程内存峰值 27 MB，内容一致
+  - 实测中发现并修复了一个 bug：**密码含中文等非 Latin-1 字符时程序崩溃**（requests 默认按 latin-1 编码 Basic 认证），现在统一按 UTF-8 发送
+  - 没测到的：坚果云本身（没有账号）。坚果云的已知限制是免费版有请求频率上限，工具会自动重试
 - **Google Drive 实测通过（2026-11-01）**：
   - 设备码授权成功。首次授权报"尚未完成 Google 验证流程"（403 access_denied），原因是同意屏幕处于"测试中"，且账号不在测试用户名单里；把账号加为测试用户（或发布为正式版）后就能通过，代码不用改
   - 普通上传：通过节点上传 1 张 PNG（804 B，带 prompt 元数据）和 1 个 MP4（15.2 MB，按 8 MiB 分块，共 2 块，走断点续传），都返回了分享链接；下载回来逐字节一致，md5 与 Drive 记录的相同，MIME 类型正确，目录 `ComfyUI-Test/plain` 自动创建
@@ -50,7 +59,7 @@
 
 | 项目 | 阻碍 | 需要准备什么 |
 |---|---|---|
-| 坚果云真实上传 | 环境网络策略需放行 `dav.jianguoyun.com` | 坚果云账号和应用密码（设到环境变量 `SNACK_WEBDAV_URL`、`SNACK_WEBDAV_USERNAME`、`SNACK_WEBDAV_PASSWORD`）；之后用手机 Cryptomator 添加 WebDAV 打开保险库 |
+| 坚果云真实上传（可选，没有账号可跳过） | 环境网络策略需放行 `dav.jianguoyun.com` | 坚果云账号和应用密码（设到环境变量 `SNACK_WEBDAV_URL`、`SNACK_WEBDAV_USERNAME`、`SNACK_WEBDAV_PASSWORD`）；之后用手机 Cryptomator 添加 WebDAV 打开保险库 |
 | 阿里云盘真实授权和上传（降级为可选） | 环境网络策略拦截了相关域名 | 在环境设置里放行 `openapi.alipan.com`、`*.aliyundrive.net`、`*.alipan.com`；准备开放平台应用的 client_id 和 secret |
 | 阿里云盘扫码授权接口 | 官方文档（语雀）在当前环境打不开，OpenList 源码里也没有这个接口 | 实测时验证；失败就改用 `--refresh-token` |
 | 用 Cryptomator App 打开 Google Drive 上的保险库 | 需要真机 | 在手机上安装 Cryptomator，添加 Google Drive |
@@ -68,7 +77,7 @@
 ## 测试步骤（准备好后照做）
 
 1. **Google Drive**：✅ 已完成（见"已验证"）。还剩两项：用手机 Cryptomator 打开 `ComfyUI-Vault-Test` 核对；测完后删除测试用的 OAuth 客户端，并执行 `auth.py logout google_drive`
-2. **WebDAV / 坚果云**：本地服务端已测通。放行 `dav.jianguoyun.com` 并配好环境变量后，用真实坚果云再测一遍，并用手机 Cryptomator（添加 WebDAV）打开保险库
+2. **WebDAV**：4 种服务端都已测通（见"已验证"）。如果以后有坚果云账号：放行 `dav.jianguoyun.com` 并配好环境变量后，用真实坚果云再测一遍，并用手机 Cryptomator（添加 WebDAV）打开保险库
 3. **阿里云盘**（可选，需要已有开放平台应用）：放行域名之后，按同样的流程测一遍
 4. **ComfyUI 实机**：确认节点能出现在节点列表里，并跑通一次"生成图片 → 上传"
 

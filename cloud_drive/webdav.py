@@ -30,6 +30,12 @@ def _join(parent_id: str, name: str) -> str:
     return f"{parent_id}/{name}" if parent_id else name
 
 
+def _basic_auth(username: str, password: str) -> Optional[tuple[bytes, bytes]]:
+    # requests encodes str credentials as latin-1, which crashes on e.g. Chinese
+    # passwords; servers (Apache, Nextcloud, WsgiDAV) expect UTF-8.
+    return (username.encode(), password.encode()) if username else None
+
+
 def is_insecure_url(url: str) -> bool:
     """Plain http to anything but the local machine sends the password in clear text."""
     parts = urlsplit(url)
@@ -64,11 +70,11 @@ class WebDAV(Provider):
     def is_authorized(self) -> bool:
         return bool(self._creds().get("url"))
 
-    def _conn(self) -> tuple[str, Optional[tuple[str, str]]]:
+    def _conn(self) -> tuple[str, Optional[tuple[bytes, bytes]]]:
         creds = self._creds()
         if not creds.get("url"):
             raise AuthRequired(f"WebDAV is not configured. {AUTH_HINT}")
-        auth = (creds["username"], creds.get("password", "")) if creds.get("username") else None
+        auth = _basic_auth(creds.get("username", ""), creds.get("password", ""))
         return creds["url"].rstrip("/") + "/", auth
 
     def _url(self, path: str) -> str:
@@ -90,7 +96,7 @@ class WebDAV(Provider):
             raise CloudDriveError("The WebDAV URL must start with https:// (or http://)")
         try:
             request(self.session, "PROPFIND", url.rstrip("/") + "/", ok=(207,), sleep=self.sleep, retries=1,
-                    auth=(username, password) if username else None,
+                    auth=_basic_auth(username, password),
                     headers={"Depth": "0", "Content-Type": "application/xml"}, data=PROPFIND_BODY)
         except CloudDriveError as e:
             if " 401 " in str(e):

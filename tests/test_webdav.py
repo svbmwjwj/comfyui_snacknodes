@@ -10,7 +10,7 @@ from cloud_drive.vault import CryptomatorVault
 from cloud_drive.webdav import WebDAV, is_insecure_url
 
 BASE = "https://dav.example.com/dav/"
-AUTH = ("me", "app-pw")
+AUTH = (b"me", b"app-pw")
 
 
 class FakeDav(FakeSession):
@@ -78,7 +78,7 @@ def test_configure_checks_credentials(env):
     assert not w.is_authorized()
     with pytest.raises(CloudDriveError, match="https://"):
         w.configure("dav.example.com", "me", "app-pw")
-    w.configure(BASE, *AUTH)
+    w.configure(BASE, "me", "app-pw")
     assert w.is_authorized() and store.get("webdav")["username"] == "me"
 
 
@@ -99,7 +99,7 @@ def test_env_vars(env, monkeypatch):
 
 def test_upload_quotes_paths_and_never_overwrites(env, tmp_path):
     _, dav, w = env
-    w.configure(BASE, *AUTH)
+    w.configure(BASE, "me", "app-pw")
     src = tmp_path / "x.png"
     src.write_bytes(b"one")
     r1 = w.upload(str(src), "ComfyUI/测试 目录/#1", "pic.png")
@@ -119,7 +119,7 @@ def test_put_retries_resend_whole_file(env, tmp_path):
     store, _, _ = env
     dav = FakeDav(fail_puts=2)
     w = WebDAV(store, dav, sleep=lambda s: None)
-    w.configure(BASE, *AUTH)
+    w.configure(BASE, "me", "app-pw")
     src = tmp_path / "v.mp4"
     src.write_bytes(b"video-bytes")
     w.upload(str(src), "", "v.mp4")
@@ -128,7 +128,7 @@ def test_put_retries_resend_whole_file(env, tmp_path):
 
 def test_put_network_error_then_success(env, tmp_path):
     store, dav, w = env
-    w.configure(BASE, *AUTH)
+    w.configure(BASE, "me", "app-pw")
     real, calls = dav._put, []
 
     def flaky(url, **kw):
@@ -146,7 +146,7 @@ def test_put_network_error_then_success(env, tmp_path):
 def test_vault_on_webdav_roundtrip(env, tmp_path):
     from cloud_drive import cryptomator as cm
     store, dav, w = env
-    w.configure(BASE, *AUTH)
+    w.configure(BASE, "me", "app-pw")
     v = CryptomatorVault.create(w, "Vault", "pw-12345678")
     src = tmp_path / "a.png"
     src.write_bytes(b"secret image")
@@ -163,3 +163,19 @@ def test_insecure_url():
     assert is_insecure_url("http://dav.example.com/")
     assert not is_insecure_url("http://127.0.0.1:8080/dav")
     assert not is_insecure_url("https://dav.example.com/")
+
+
+def test_non_latin1_password_is_sent_as_utf8(tmp_path):
+    """requests would encode str credentials as latin-1 and crash on Chinese passwords."""
+    import base64
+    from requests.auth import _basic_auth_str
+    store = CredentialStore(tmp_path / "c.json")
+    seen = []
+
+    class S(FakeSession):
+        pass
+    s = S()
+    s.route("PROPFIND", BASE, lambda url, **kw: (seen.append(kw["auth"]), FakeResponse(207, content=b""))[1])
+    WebDAV(store, s, sleep=lambda x: None).configure(BASE, "用户", "密码 pw!")
+    header = _basic_auth_str(*seen[0])
+    assert base64.b64decode(header.split()[1]).decode("utf-8") == "用户:密码 pw!"
