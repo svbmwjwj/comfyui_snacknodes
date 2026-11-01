@@ -35,6 +35,8 @@
 - 52 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
+- **ComfyUI 实机测试通过（2026-11-01）**：在云端临时环境里装了最新版 ComfyUI（提交 `6d35280`，2026-10-31；前端 1.57.6；CPU 模式）。节点加载无报错，显示名、分类、下拉选项都正确；通过 API 和网页"运行"按钮分别执行了"Empty Image → Save to Cloud Drive（WebDAV）"，状态 success，图片按日期变量传到了 WebDAV，本地副本按 `filename_prefix` 存进 `output/snack/`，节点下方显示预览图。截图流程见 Playwright 脚本（未入库）
+  - 发现：节点返回的上传结果文字（`ui.text`）在新前端里不会显示，用户在界面上看不到上传到了哪里，只能接到 `remote_paths` 输出
 - **WebDAV 实测通过（2026-11-01）**，测了 4 种服务端实现，每种都跑同一套流程（脚本流程：连接测试 → 明文上传两次 → 新建保险库并加密上传 → 解锁官方 cryptofs 建的保险库并继续写入；保险库都通过 WebDAV 下载回来，交给官方 `cryptofs` 校验 SHA-256）：
 
   | 服务端 | 代表的真实场景 | 结果 |
@@ -63,7 +65,6 @@
 | 阿里云盘真实授权和上传（降级为可选） | 环境网络策略拦截了相关域名 | 在环境设置里放行 `openapi.alipan.com`、`*.aliyundrive.net`、`*.alipan.com`；准备开放平台应用的 client_id 和 secret |
 | 阿里云盘扫码授权接口 | 官方文档（语雀）在当前环境打不开，OpenList 源码里也没有这个接口 | 实测时验证；失败就改用 `--refresh-token` |
 | 用 Cryptomator App 打开 Google Drive 上的保险库 | 需要真机 | 在手机上安装 Cryptomator，添加 Google Drive |
-| 在真实 ComfyUI 中加载节点、执行工作流 | 权限策略拦截了"安装并运行外部 ComfyUI 代码" | 二选一：授权在当前环境安装 ComfyUI；或在 AutoDL 上 clone 这个分支，把启动日志发过来 |
 
 ## 测试前的环境配置（在云环境设置里完成，不要把密钥贴进聊天）
 
@@ -79,7 +80,7 @@
 1. **Google Drive**：✅ 已完成（见"已验证"）。还剩两项：用手机 Cryptomator 打开 `ComfyUI-Vault-Test` 核对；测完后删除测试用的 OAuth 客户端，并执行 `auth.py logout google_drive`
 2. **WebDAV**：4 种服务端都已测通（见"已验证"）。如果以后有坚果云账号：放行 `dav.jianguoyun.com` 并配好环境变量后，用真实坚果云再测一遍，并用手机 Cryptomator（添加 WebDAV）打开保险库
 3. **阿里云盘**（可选，需要已有开放平台应用）：放行域名之后，按同样的流程测一遍
-4. **ComfyUI 实机**：确认节点能出现在节点列表里，并跑通一次"生成图片 → 上传"
+4. **ComfyUI 实机**：✅ 已完成（见"已验证"）。如有条件，在 AutoDL 上用真实模型和 GPU 再跑一次
 
 ## 合并前注意
 
