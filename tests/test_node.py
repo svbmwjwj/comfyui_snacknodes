@@ -112,3 +112,24 @@ def test_nothing_to_upload(node_module):
     mod = node_module[0]
     with pytest.raises(ValueError, match="Nothing to upload"):
         mod.SaveToCloudDrive().save_and_upload("Google Drive", "none", "a", "p", True)
+
+
+def test_expand_date_tokens(node_module):
+    from datetime import datetime
+    mod = node_module[0]
+    now = datetime(2026, 3, 7, 9, 5, 4)
+    assert mod.expand_date_tokens("ComfyUI/%date:yyyy-MM-dd%/x", now) == "ComfyUI/2026-03-07/x"
+    assert mod.expand_date_tokens("%date:yyMMdd_hhmmss%", now) == "260307_090504"
+    assert mod.expand_date_tokens("%year%/%month%/%day% %hour%%minute%%second%", now) == "2026/03/07 090504"
+    assert mod.expand_date_tokens("plain/%width%", now) == "plain/%width%"
+
+
+def test_remote_folder_date_tokens(node_module):
+    from datetime import datetime
+    mod, _, drive, _ = node_module
+    images = FakeTensor(np.random.rand(1, 8, 8, 3).astype(np.float32))
+    res = mod.SaveToCloudDrive().save_and_upload("Google Drive", "none", "ComfyUI/%date:yyyy-MM%", "pic", True,
+                                                 images=images)
+    month = datetime.now().strftime("%Y-%m")
+    assert res["result"][0] == f"local:ComfyUI/{month}/pic_00001_.png"
+    assert (drive / "ComfyUI" / month / "pic_00001_.png").exists()

@@ -3,7 +3,9 @@
 Auth uses the OAuth 2.0 device flow, which works on headless GPU servers: the
 user opens a URL on any device and types a short code. The scope is
 ``drive.file``, so the tool can only see files and folders it created itself.
-The user brings their own OAuth client (type "TVs and Limited Input devices").
+A published, project-wide OAuth client is built in, so users only approve access
+for their own Google account; files always go to that user's own Drive. Users can
+still bring their own client (type "TVs and Limited Input devices").
 """
 
 from __future__ import annotations
@@ -27,6 +29,31 @@ UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
 SCOPE = "https://www.googleapis.com/auth/drive.file"
 FOLDER_MIME = "application/vnd.google-apps.folder"
 CHUNK_SIZE = 32 * 256 * 1024  # 8 MiB, must be a multiple of 256 KiB
+
+# Built-in OAuth client ("TVs and Limited Input devices", published to production).
+# For installed/device apps Google does not treat the client secret as confidential:
+# it only identifies the app and grants no access to anyone's Drive by itself.
+BUILTIN_CLIENT_ID = ""
+BUILTIN_CLIENT_SECRET = ""
+
+
+def resolve_client(client_id: Optional[str] = None,
+                   client_secret: Optional[str] = None) -> tuple[Optional[str], Optional[str], str]:
+    """Pick the OAuth client: command-line args, then env vars, then the built-in one.
+
+    Returns (client_id, client_secret, source); ids are None when nothing is configured.
+    """
+    for cid, sec, source in (
+        (client_id, client_secret, "command line"),
+        (os.environ.get("SNACK_GDRIVE_CLIENT_ID"), os.environ.get("SNACK_GDRIVE_CLIENT_SECRET"), "environment"),
+        (BUILTIN_CLIENT_ID, BUILTIN_CLIENT_SECRET, "built-in"),
+    ):
+        if cid and sec:
+            return cid, sec, source
+        if cid or sec:
+            raise CloudDriveError(f"Google OAuth client from {source} needs both a client ID and a secret.")
+    return None, None, "none"
+
 
 AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py google_drive"
 

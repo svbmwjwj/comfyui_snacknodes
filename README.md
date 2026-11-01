@@ -8,7 +8,7 @@
 
 - 接收 `images`、`video`，或 output 目录中已有文件的路径（`file_paths`，一行一个）
 - 可选在本地保留一份副本，也可以只用临时目录
-- 远程文件夹不存在时会自动创建，例如 `ComfyUI/2026-11`
+- 远程文件夹可以自己设置，不存在时会自动创建；支持日期变量，例如 `ComfyUI/%date:yyyy-MM%` 会自动按月归档（详见下文）
 - 输出上传结果：Google Drive 返回分享链接；阿里云盘和加密文件返回 `provider:路径`
 - 凭据和密钥**不会写进工作流**，分享工作流不会泄露账号
 - 分片上传，网络错误或限流时自动重试；Google Drive 支持断点续传
@@ -30,18 +30,24 @@ pip install -r custom_nodes/comfyui_snacknodes/requirements.txt
 
 ### Google Drive
 
-1. 打开 [Google Cloud Console](https://console.cloud.google.com/)，新建一个项目，并启用 **Google Drive API**。
-2. 配置 **OAuth 同意屏幕**：用户类型选"外部"，然后把发布状态改为 **"正式版（In production）"**。
-   - 本工具只申请 `drive.file` 权限，属于非敏感权限，发布不需要经过 Google 审核。
-   - 如果停留在"测试"状态，refresh token 每 7 天就会失效。
-3. 在"凭据"页面创建 OAuth 客户端 ID，应用类型选 **"电视和受限输入设备"（TVs and Limited Input devices）**。
-4. 运行下面的命令，按提示在手机或电脑上打开网址并输入验证码：
+运行下面的命令，按提示在手机或电脑上打开网址、输入验证码，再用你自己的 Google 账号登录并同意授权即可：
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py google_drive --client-id 你的ID --client-secret 你的Secret
+python custom_nodes/comfyui_snacknodes/auth.py google_drive
 ```
 
-`drive.file` 权限意味着本工具**只能看到它自己创建的文件和文件夹**，读不到你 Drive 里的其他任何内容。
+- 文件上传到**你自己的 Google Drive**，占用你自己的空间。本项目内置的 OAuth 客户端只用来标识这个应用，本身访问不了任何人的 Drive。
+- 只申请 `drive.file` 权限：本工具**只能看到它自己创建的文件和文件夹**，读不到你 Drive 里的其他任何内容。
+
+<details>
+<summary>进阶：使用你自己的 OAuth 客户端</summary>
+
+1. 打开 [Google Cloud Console](https://console.cloud.google.com/)，新建项目并启用 **Google Drive API**。
+2. 配置 OAuth 同意屏幕：用户类型选"外部"，发布状态改为 **"正式版（In production）"**。`drive.file` 是非敏感权限，发布不需要经过 Google 审核。如果停留在"测试"状态，未加入测试用户的账号会被拒绝（提示"尚未完成 Google 验证流程"），而且 refresh token 每 7 天就会失效。
+3. 在"凭据"页面创建 OAuth 客户端 ID，应用类型选 **"电视和受限输入设备"（TVs and Limited Input devices）**。
+4. 运行 `auth.py google_drive --client-id 你的ID --client-secret 你的Secret`，或者设置环境变量 `SNACK_GDRIVE_CLIENT_ID` / `SNACK_GDRIVE_CLIENT_SECRET`。
+
+</details>
 
 ### 阿里云盘
 
@@ -69,6 +75,17 @@ python custom_nodes/comfyui_snacknodes/auth.py logout google_drive
 凭据保存在 `~/.config/comfyui_snacknodes/cloud_drive.json`，文件权限为 600。可以用 `SNACKNODES_CONFIG_DIR` 环境变量修改位置。
 也可以不用凭据文件，改用环境变量：`SNACK_GDRIVE_CLIENT_ID` / `SNACK_GDRIVE_CLIENT_SECRET` / `SNACK_GDRIVE_REFRESH_TOKEN`，阿里云盘对应 `SNACK_ALIYUNDRIVE_*`。
 
+## 远程文件夹与日期变量
+
+节点的 `remote_folder` 填网盘上的目录，可以有多层，例如 `ComfyUI/portraits`；开启加密时，它是保险库内部的路径。`remote_folder` 和 `filename_prefix` 都支持以下变量（按服务器本地时间）：
+
+| 写法 | 示例结果 |
+|---|---|
+| `%date:yyyy-MM-dd%` | `2026-11-01`（可用 `yyyy` `yy` `MM` `dd` `hh` `mm` `ss` 自由组合） |
+| `%year%` `%month%` `%day%` `%hour%` `%minute%` `%second%` | `2026` `11` `01` … |
+
+例如 `ComfyUI/%date:yyyy-MM%/%date:dd%` 会按月建文件夹，月份下面再按日期分子文件夹。本地副本的位置由 `filename_prefix` 决定（写法和官方 Save Image 节点相同，如 `子目录/前缀`）。
+
 ## 端到端加密（Cryptomator 保险库）
 
 在节点上把 `encryption` 设为 **Cryptomator vault** 后，文件会**先在本机加密，再上传**：
@@ -80,11 +97,20 @@ python custom_nodes/comfyui_snacknodes/auth.py logout google_drive
 这就是 Cryptomator 的保险库格式（vault format 8），所以你可以用 **Cryptomator 官方客户端（桌面端、iOS、Android）** 直接打开、浏览和解密，不依赖本工具。
 兼容性已经用 Cryptomator 官方的 Java 库 `cryptofs` 双向验证过，CI 每次都会重跑这项测试：本工具写的保险库，官方能逐字节正确解密；官方创建的保险库，本工具也能解锁并继续写入。
 
+加密**默认关闭**，需要先创建保险库，再在节点上打开。
+
 ### 创建或解锁保险库
 
 ```bash
 python custom_nodes/comfyui_snacknodes/auth.py vault-create google_drive --path ComfyUI-Vault
 ```
+
+创建时可以选择：
+
+- **[1] 自己输入密码**（至少 8 位，需要输入两次）
+- **[2] 自动生成强密码**：例如 `k7mpq-x3wfa-…`，共 6 组，约 148 位强度，不含 0/O、1/l 这类容易混淆的字符。生成后需要你输入最后一组来确认已保存，确认后才会创建保险库
+
+也可以直接加 `--generate-password` 或 `--own-password` 跳过选择。
 
 如果阿里云盘上已经有一个用 Cryptomator 创建的保险库，用这个命令解锁：
 
@@ -92,7 +118,7 @@ python custom_nodes/comfyui_snacknodes/auth.py vault-create google_drive --path 
 python custom_nodes/comfyui_snacknodes/auth.py vault-unlock aliyundrive --path 我的保险库
 ```
 
-> ⚠️ **密码一旦丢失，文件无法恢复。** 本工具不保存密码，只在本机保存解锁后的密钥。
+> ⚠️ **密码是恢复文件的唯一方式。** 没有找回、重置或恢复密钥，请立即存进密码管理器。本工具不保存密码，只在本机保存解锁后的密钥。
 
 ### 用 Cryptomator 打开
 

@@ -15,6 +15,10 @@
 
 ## 已做过的需求决策
 
+- （2026-11-01 补充）`remote_folder` 支持日期变量（`%date:yyyy-MM%` 等），可以按日期自动归档
+- （2026-11-01 补充）加密默认关闭。创建保险库时用户自己选择：输入密码，或自动生成密码。都会警告"密码是恢复文件的唯一方式"；自动生成的密码要输入最后一组确认已保存。不做恢复密钥
+- （2026-11-01 补充）Google Drive 内置一个由项目方发布为正式版的公共 OAuth 客户端，用户只需运行 `auth.py google_drive` 并输入验证码；文件存在用户自己的 Drive、占用用户自己的空间。用户仍可通过参数或环境变量使用自己的客户端。**待办：项目方提供客户端 ID 和 secret，填入 `cloud_drive/google_drive.py` 的 `BUILTIN_CLIENT_ID` 和 `BUILTIN_CLIENT_SECRET`**
+
 - 只面向个人用户，不接入云厂商的对象存储（如 S3、GCS）
 - 先做阿里云盘和 Google Drive，因为它们有官方接口
 - 夸克网盘和 iCloud 只能走非官方接口，暂缓。iCloud 是美区账号（以后可能换德区），都在国际服务器上，技术上可行
@@ -24,7 +28,7 @@
 
 ## 已验证
 
-- 35 个自动化测试全部通过（`pytest`），`ruff check .` 无报错
+- 43 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
 - **Google Drive 实测通过（2026-11-01）**：

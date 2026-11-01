@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """One-time setup for Save to Cloud Drive. Run on the machine that runs ComfyUI.
 
-  python auth.py google_drive  --client-id ID --client-secret SECRET
+  python auth.py google_drive  [--client-id ID --client-secret SECRET]
   python auth.py aliyundrive   --client-id ID --client-secret SECRET
-  python auth.py vault-create  google_drive  --path ComfyUI-Vault
+  python auth.py vault-create  google_drive  --path ComfyUI-Vault  [--generate-password]
   python auth.py vault-unlock  aliyundrive   --path ComfyUI-Vault
   python auth.py status
   python auth.py logout        google_drive
@@ -36,10 +36,14 @@ def _ask(prompt: str, value: str | None, secret: bool = False) -> str:
 
 
 def auth_google(args, store):
-    from cloud_drive.google_drive import GoogleDrive
-    client_id = _ask("Google OAuth client ID: ", args.client_id or os.environ.get("SNACK_GDRIVE_CLIENT_ID"))
-    client_secret = _ask("Google OAuth client secret: ",
-                         args.client_secret or os.environ.get("SNACK_GDRIVE_CLIENT_SECRET"), secret=True)
+    from cloud_drive.google_drive import GoogleDrive, resolve_client
+    client_id, client_secret, source = resolve_client(args.client_id, args.client_secret)
+    if not client_id:
+        print("No built-in Google OAuth client in this build; use your own (see README).")
+        client_id = _ask("Google OAuth client ID: ", None)
+        client_secret = _ask("Google OAuth client secret: ", None, secret=True)
+    elif source != "built-in":
+        print(f"Using your own OAuth client (from {source}).")
     drive = GoogleDrive(store)
     flow = drive.start_device_flow(client_id)
     print(f"\n  1. On any device, open:  {flow['verification_url']}")
@@ -70,27 +74,61 @@ def auth_aliyun(args, store):
     print("Aliyun Drive authorized.")
 
 
-def _vault_password(confirm: bool) -> str:
+PASSWORD_WARNING = """
+  !! The vault password is the ONLY way to recover your files. There is no reset
+  !! and no recovery key. Save it in a password manager now.
+  !! 保险库密码是恢复文件的唯一方式，没有找回或重置的途径，请立即妥善保存（如密码管理器）。
+"""
+# Unambiguous alphabet (no 0/O, 1/l/I): 6 groups x 5 chars ~ 148 bits.
+_GEN_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
+
+
+def generate_password(groups: int = 6, size: int = 5) -> str:
+    import secrets
+    return "-".join("".join(secrets.choice(_GEN_ALPHABET) for _ in range(size)) for _ in range(groups))
+
+
+def _confirm_saved(password: str) -> None:
+    # Make the user prove they recorded it before anything is uploaded.
+    tail = password.rsplit("-", 1)[-1]
+    for _ in range(3):
+        if input("Type the LAST group of the password to confirm you saved it: ").strip() == tail:
+            return
+        print("  That does not match.")
+    sys.exit("Not confirmed. Nothing was created.")
+
+
+def _new_vault_password(args) -> str:
     env = os.environ.get("SNACK_VAULT_PASSWORD")
     if env:
         return env
+    print(PASSWORD_WARNING)
+    choice = "2" if args.generate_password else "1" if args.own_password else ""
+    while choice not in ("1", "2"):
+        choice = input("  [1] Enter my own password\n  [2] Generate a strong password for me\nChoose 1 or 2: ").strip()
+    if choice == "2":
+        pw = generate_password()
+        print(f"\n  Your vault password:   {pw}\n")
+        _confirm_saved(pw)
+        return pw
     pw = getpass.getpass("Vault password: ")
-    if confirm:
-        if len(pw) < 8:
-            sys.exit("Use at least 8 characters. There is no way to recover a forgotten vault password.")
-        if getpass.getpass("Repeat password: ") != pw:
-            sys.exit("Passwords do not match.")
+    if len(pw) < 8:
+        sys.exit("Use at least 8 characters.")
+    if getpass.getpass("Repeat password: ") != pw:
+        sys.exit("Passwords do not match.")
     return pw
 
 
 def vault(args, store, create: bool):
     provider = PROVIDERS[args.provider](store)
-    password = _vault_password(confirm=create)
+    if create:
+        password = _new_vault_password(args)
+    else:
+        password = os.environ.get("SNACK_VAULT_PASSWORD") or getpass.getpass("Vault password: ")
     print("Deriving key (scrypt, a few seconds)...")
     if create:
         v = CryptomatorVault.create(provider, args.path, password)
         print(f"Created Cryptomator vault '{args.path}' on {provider.display_name}.")
-        print("IMPORTANT: store the password safely; without it the files cannot be decrypted.")
     else:
         v = CryptomatorVault.unlock(provider, args.path, password)
         print(f"Unlocked vault '{args.path}' on {provider.display_name}.")
@@ -112,14 +150,19 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in PROVIDERS:
         p = sub.add_parser(name, help=f"Authorize {PROVIDERS[name].display_name}")
-        p.add_argument("--client-id")
-        p.add_argument("--client-secret")
+        own = " (optional: a built-in client is used by default)" if name == "google_drive" else ""
+        p.add_argument("--client-id", help="Your own OAuth client ID" + own)
+        p.add_argument("--client-secret", help="Your own OAuth client secret" + own)
         if name == "aliyundrive":
             p.add_argument("--refresh-token", help="Skip the QR code and import an existing refresh token")
     for cmd in ("vault-create", "vault-unlock"):
         p = sub.add_parser(cmd, help=f"{cmd.split('-')[1].title()} a Cryptomator vault")
         p.add_argument("provider", choices=list(PROVIDERS))
         p.add_argument("--path", default="ComfyUI-Vault", help="Vault folder on the drive")
+        if cmd == "vault-create":
+            g = p.add_mutually_exclusive_group()
+            g.add_argument("--generate-password", action="store_true", help="Generate a strong password")
+            g.add_argument("--own-password", action="store_true", help="Type your own password")
     sub.add_parser("status", help="Show what is configured")
     p = sub.add_parser("logout", help="Remove stored credentials and vault keys")
     p.add_argument("provider", choices=list(PROVIDERS))

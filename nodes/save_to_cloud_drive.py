@@ -6,6 +6,8 @@ import json
 import logging
 import mimetypes
 import os
+import re
+from datetime import datetime
 
 import numpy as np
 from PIL import Image
@@ -18,6 +20,25 @@ logger = logging.getLogger(__name__)
 
 PROVIDER_LABELS = {cls.display_name: name for name, cls in PROVIDERS.items()}
 ENCRYPTION_OPTIONS = ["none", "Cryptomator vault"]
+
+
+_DATE_TOKEN = re.compile(r"%date:([^%]+)%")
+_DATE_PARTS = re.compile(r"yyyy|yy|MM|M|dd|d|hh|h|mm|m|ss|s")
+_SIMPLE_TOKENS = {"year": "%Y", "month": "%m", "day": "%d", "hour": "%H", "minute": "%M", "second": "%S"}
+
+
+def expand_date_tokens(text: str, now: datetime | None = None) -> str:
+    """Expand %date:yyyy-MM-dd% (the Save Image syntax) and %year% %month% %day%
+    %hour% %minute% %second%, using the server's local time."""
+    now = now or datetime.now()
+    parts = {"yyyy": f"{now.year:04}", "yy": f"{now.year % 100:02}", "MM": f"{now.month:02}",
+             "M": str(now.month), "dd": f"{now.day:02}", "d": str(now.day), "hh": f"{now.hour:02}",
+             "h": str(now.hour), "mm": f"{now.minute:02}", "m": str(now.minute),
+             "ss": f"{now.second:02}", "s": str(now.second)}
+    text = _DATE_TOKEN.sub(lambda m: _DATE_PARTS.sub(lambda p: parts[p.group(0)], m.group(1)), text or "")
+    for name, fmt in _SIMPLE_TOKENS.items():
+        text = text.replace(f"%{name}%", now.strftime(fmt))
+    return text
 
 
 def _metadata_disabled() -> bool:
@@ -80,7 +101,9 @@ class SaveToCloudDrive:
                 "remote_folder": ("STRING", {
                     "default": "ComfyUI",
                     "tooltip": "Folder on the drive (or inside the vault when encrypting), e.g. "
-                               "ComfyUI/portraits. Created if missing.",
+                               "ComfyUI/portraits or ComfyUI/%date:yyyy-MM%. Created if missing. Date tokens: "
+                               "%date:yyyy-MM-dd%, %year%, %month%, %day%, %hour%, %minute%, %second% "
+                               "(server local time).",
                 }),
                 "filename_prefix": ("STRING", {
                     "default": "ComfyUI",
@@ -108,6 +131,9 @@ class SaveToCloudDrive:
         if provider_name not in PROVIDERS:
             raise ValueError(f"Unknown provider: {provider}")
 
+        now = datetime.now()
+        remote_folder = expand_date_tokens(remote_folder, now)
+        filename_prefix = expand_date_tokens(filename_prefix, now)
         folder_paths = _folder_paths()
         out_dir = folder_paths.get_output_directory() if keep_local_copy else folder_paths.get_temp_directory()
         save_type = "output" if keep_local_copy else "temp"
