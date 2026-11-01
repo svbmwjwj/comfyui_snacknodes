@@ -32,7 +32,7 @@
 
 ## 已验证
 
-- 59 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
+- 57 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
 - **ComfyUI 实机测试通过（2026-11-01）**：在云端临时环境里装了最新版 ComfyUI（提交 `6d35280`，2026-10-31；前端 1.57.6；CPU 模式）。节点加载无报错，显示名、分类、下拉选项都正确；通过 API 和网页"运行"按钮分别执行了"Empty Image → Save to Cloud Drive（WebDAV）"，状态 success，图片按日期变量传到了 WebDAV，本地副本按 `filename_prefix` 存进 `output/snack/`，节点下方显示预览图。截图流程见 Playwright 脚本（未入库）
