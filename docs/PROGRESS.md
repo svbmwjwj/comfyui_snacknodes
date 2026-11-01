@@ -17,7 +17,7 @@
 
 - （2026-11-01 补充）`remote_folder` 支持日期变量（`%date:yyyy-MM%` 等），可以按日期自动归档
 - （2026-11-01 补充）加密默认关闭。创建保险库时用户自己选择：输入密码，或自动生成密码。都会警告"密码是恢复文件的唯一方式"；自动生成的密码要输入最后一组确认已保存。不做恢复密钥
-- （2026-11-01 补充）Google Drive 内置一个由项目方发布为正式版的公共 OAuth 客户端，用户只需运行 `auth.py google_drive` 并输入验证码；文件存在用户自己的 Drive、占用用户自己的空间。用户仍可通过参数或环境变量使用自己的客户端。**待办：项目方提供客户端 ID 和 secret，填入 `cloud_drive/google_drive.py` 的 `BUILTIN_CLIENT_ID` 和 `BUILTIN_CLIENT_SECRET`**
+- （2026-11-01 补充）Google Drive 内置一个由项目方发布为正式版的公共 OAuth 客户端，用户只需运行 `auth.py google_drive` 并输入验证码；文件存在用户自己的 Drive、占用用户自己的空间。用户仍可通过参数或环境变量使用自己的客户端。项目方已在网页上把客户端 ID 和 secret 填入 `cloud_drive/google_drive.py`（提交 `b9ed3e8`）；同意屏幕已发布为正式版，首页和隐私政策都指向本仓库
 
 - 只面向个人用户，不接入云厂商的对象存储（如 S3、GCS）
 - 先做阿里云盘和 Google Drive，因为它们有官方接口
@@ -35,6 +35,7 @@
   - 设备码授权成功。首次授权报"尚未完成 Google 验证流程"（403 access_denied），原因是同意屏幕处于"测试中"，且账号不在测试用户名单里；把账号加为测试用户（或发布为正式版）后就能通过，代码不用改
   - 普通上传：通过节点上传 1 张 PNG（804 B，带 prompt 元数据）和 1 个 MP4（15.2 MB，按 8 MiB 分块，共 2 块，走断点续传），都返回了分享链接；下载回来逐字节一致，md5 与 Drive 记录的相同，MIME 类型正确，目录 `ComfyUI-Test/plain` 自动创建
   - 再次上传到同一目录：沿用已有文件夹，不会重复建；同名文件会多出一份（Drive 允许重名，这是预期行为）
+  - **内置客户端从零开始测试**：去掉环境变量，使用空的凭据目录，直接运行 `auth.py google_drive`（不带任何参数），一次授权通过，没有再出现"尚未完成 Google 验证流程"。之后的普通上传（`ComfyUI-Test/%date:yyyy-MM%` 展开为 `2026-11`）、按交互流程创建保险库（选择自动生成密码，并输入最后一组确认）、加密上传（`ComfyUI/%date:yyyy-MM-dd%`）都通过，官方 `cryptofs` 解密后的 SHA-256 与原文件一致
   - 加密上传：`vault-create` 在 Drive 上建了 `ComfyUI-Vault-Test`，通过节点上传到 `ComfyUI/enc-test`；把整个保险库下载到本地后，用官方 `cryptofs` 解密，目录结构和两个文件的 SHA-256 都与原文件一致
 
 ## 还没验证（待测试）
@@ -62,6 +63,8 @@
 3. **ComfyUI 实机**：确认节点能出现在节点列表里，并跑通一次"生成图片 → 上传"
 
 ## 合并前注意
+
+- **隐私政策链接**：Google 同意屏幕里的链接现在指向 `blob/claude/stoic-fermat-wano83/PRIVACY.md`，合并后要改成 `blob/main/PRIVACY.md`，否则删除分支后链接会失效
 
 - 合并到 main 后，`publish_action.yml` 会自动把 2.0.0 发布到 Comfy Registry，发布后旧节点会消失
 - `publish_action.yml` 和 `publish_node.yml` 是两个重复的发布流程，建议只保留一个
