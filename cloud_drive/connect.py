@@ -22,7 +22,7 @@ from .s3 import GB, R2, parse_r2_url
 from .vault import CryptomatorVault
 from .webdav import WebDAV, is_insecure_url
 
-README = "https://github.com/svbmwjwj/comfyui_snacknodes#-授权"
+README = "https://github.com/svbmwjwj/SnackNodes#-授权"
 DEFAULT_VAULT = "ComfyUI-Vault"
 MIN_VAULT_PASSWORD = 8
 

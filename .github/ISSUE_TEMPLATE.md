@@ -1,4 +1,4 @@
-* comfyui_snacknodes version:
+* SnackNodes version:
 * Python version:
 * Operating System:
 

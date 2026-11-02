@@ -11,7 +11,7 @@ Google Drive · Cloudflare R2 · WebDAV ｜ 可选 Cryptomator 端到端加密
 [![Comfy Registry](https://img.shields.io/badge/Comfy_Registry-SnackNodes-blue)](https://registry.comfy.org/publishers/svbmwjwj/nodes/SnackNodes)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](LICENSE)
 
-[项目主页](https://snacknodes.linksluckytime.com) · [隐私政策](https://snacknodes.linksluckytime.com/privacy.html) · [问题反馈](https://github.com/svbmwjwj/comfyui_snacknodes/issues)
+[项目主页](https://snacknodes.linksluckytime.com) · [隐私政策](https://snacknodes.linksluckytime.com/privacy.html) · [问题反馈](https://github.com/svbmwjwj/SnackNodes/issues)
 
 </div>
 
@@ -63,10 +63,10 @@ Google Drive · Cloudflare R2 · WebDAV ｜ 可选 Cryptomator 端到端加密
 comfy node install SnackNodes
 ```
 
-或者手动安装（最后的 `SnackNodes` 是文件夹名，和 Registry 安装的一致）：
+或者手动安装：
 
 ```bash
-cd ComfyUI/custom_nodes && git clone https://github.com/svbmwjwj/comfyui_snacknodes SnackNodes
+cd ComfyUI/custom_nodes && git clone https://github.com/svbmwjwj/SnackNodes
 ```
 
 ```bash
@@ -216,7 +216,7 @@ python custom_nodes/SnackNodes/auth.py logout r2
 
 ## 🧪 实验性支持（待实测）
 
-下面两种存储的代码和自动化测试都已完成，但**还没用真实账号测试过**，所以暂时不在节点的「网盘」下拉框里显示，只能用终端命令配置和测试。实测通过后会放进节点。欢迎有账号的朋友试用并[反馈](https://github.com/svbmwjwj/comfyui_snacknodes/issues)。
+下面两种存储的代码和自动化测试都已完成，但**还没用真实账号测试过**，所以暂时不在节点的「网盘」下拉框里显示，只能用终端命令配置和测试。实测通过后会放进节点。欢迎有账号的朋友试用并[反馈](https://github.com/svbmwjwj/SnackNodes/issues)。
 
 <details>
 <summary><b>S3 兼容存储</b>：AWS S3、Backblaze B2、MinIO、Wasabi……</summary>

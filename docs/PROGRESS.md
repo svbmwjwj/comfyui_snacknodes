@@ -4,7 +4,7 @@
 
 ## 已完成
 
-0. **发布 2.0.0（2026-11-01）**：[PR #1](https://github.com/svbmwjwj/comfyui_snacknodes/pull/1) 合并到 main（合并提交 `5039246`），`publish_action.yml` 自动运行并成功上传到 Comfy Registry（此前 Registry 为 v1.0.1）。PR 上 `validate`（node-diff）失败：它加载 main 上的旧代码时缺少 torch；即使能加载，也只会报告 4 个旧节点被删除，属于有意的不兼容改动，PR 上已留言说明
+0. **发布 2.0.0（2026-11-01）**：[PR #1](https://github.com/svbmwjwj/SnackNodes/pull/1) 合并到 main（合并提交 `5039246`），`publish_action.yml` 自动运行并成功上传到 Comfy Registry（此前 Registry 为 v1.0.1）。PR 上 `validate`（node-diff）失败：它加载 main 上的旧代码时缺少 torch；即使能加载，也只会报告 4 个旧节点被删除，属于有意的不兼容改动，PR 上已留言说明
 
 1. **兼容性检查**：对照最新的 ComfyUI 后端和前端检查了旧节点，结论是旧节点能正常加载，但有几个功能 bug。
 2. **下架旧节点**（提交 `eeed202`）：删除 Image Info、Image Scaler、Text Box、Text Processor 四个节点，README 里给出了对应的官方替代节点。
@@ -64,7 +64,10 @@
      - **没能确认 `SnackNodes` 在 Registry 上没被占用**（API 打不开）。GitHub 代码搜索里没有别的仓库用这个名字。如果被占用，合并后发布那一步会失败，到时换名字即可。用户可以自己打开 https://registry.comfy.org/nodes/SnackNodes 看一眼
    - 改动：`pyproject.toml` `name = "SnackNodes"`（版本仍 2.1.0）；终端命令提示不再写死文件夹名，改为读实际安装目录（`cloud_drive/paths.py` 的 `AUTH_SCRIPT`），新老安装都正确；README / 主页的安装步骤改为搜索 `SnackNodes`、`comfy node install SnackNodes`、手动 `git clone ... SnackNodes`；README 加了「从 2.0.0 升级」：卸载 `comfyui_snacknodes` 再装 `SnackNodes`，不要同时装两个
    - **凭据目录保持 `~/.config/comfyui_snacknodes/` 不变**，换装后不用重新连接；节点类名 `SnackSaveToCloudDrive` 不变，旧工作流照常打开
-   - GitHub 仓库名没改（用 `git clone` 不指定目录时文件夹仍叫 `comfyui_snacknodes`）。要不要改仓库名由用户决定：GitHub 会自动跳转旧地址，但 `pyproject.toml` 的 Repository/Icon 链接、主页和隐私政策里的链接最好一起改
+   - **GitHub 仓库改名为 `SnackNodes`（用户决定，2026-11-02）**：仓库里的链接（`pyproject.toml` Repository/Icon、README、主页、隐私政策、连接说明的教程链接、Issue 模板、CI 名称）已全部改成 `svbmwjwj/SnackNodes`，手动安装改为 `git clone https://github.com/svbmwjwj/SnackNodes`。**需要用户在 GitHub 上操作改名**：仓库 Settings → General → Repository name。改名后 GitHub 会自动把旧地址（网页、git clone/pull、raw 链接）跳转到新地址；主页用的是自定义域名（`docs/CNAME`），不受影响，Google 品牌验证也不受影响。改名前新链接会 404，所以**要在合并到 main 之前改名**
+     - 本地克隆可以继续用，也可以更新远程地址：`git remote set-url origin https://github.com/svbmwjwj/SnackNodes`
+     - 注意：以后不要再新建一个叫 `comfyui_snacknodes` 的仓库，否则旧地址的跳转会失效
+     - 当前云端会话的 GitHub 权限是按旧仓库名授予的，改名后新会话可能需要重新添加仓库
    - **节点说明（DESCRIPTION）缩短为一句话**：ComfyUI 鼠标悬停在节点标题上就会显示说明（不是只在节点信息里），原来的长用法太乱。细节都在各项的悬停提示里；「同名文件不覆盖」移到「网盘目录」的提示里
    - 合并后要做（在 registry.comfy.org 发布者后台手动）：确认新节点 `SnackNodes` 已发布；把旧节点 `comfyui_snacknodes` 的描述改成「已改名为 SnackNodes」或标记弃用
 

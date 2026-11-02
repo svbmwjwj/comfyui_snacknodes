@@ -1,5 +1,5 @@
 # GitHub CI build pipeline
-name: comfyui_snacknodes CI build
+name: SnackNodes CI build
 
 on:
   pull_request:

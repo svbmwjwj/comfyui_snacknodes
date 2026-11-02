@@ -42,7 +42,7 @@ including the Limited Use requirements.
 
 ## Contact
 
-Open an issue at <https://github.com/svbmwjwj/comfyui_snacknodes/issues>.
+Open an issue at <https://github.com/svbmwjwj/SnackNodes/issues>.
 
 ---
 

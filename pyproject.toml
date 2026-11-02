@@ -18,12 +18,12 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/svbmwjwj/comfyui_snacknodes"
+Repository = "https://github.com/svbmwjwj/SnackNodes"
 
 [tool.comfy]
 PublisherId = "svbmwjwj"
 DisplayName = "SnackNodes"
-Icon = "https://raw.githubusercontent.com/svbmwjwj/comfyui_snacknodes/main/web/icon.png"
+Icon = "https://raw.githubusercontent.com/svbmwjwj/SnackNodes/main/web/icon.png"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
