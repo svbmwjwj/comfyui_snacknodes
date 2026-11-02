@@ -4,9 +4,9 @@ requires = ["setuptools>=65.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "comfyui_snacknodes"
-description = "Save ComfyUI outputs to your own Google Drive, WebDAV server (Nutstore, Nextcloud, NAS...) or Aliyun Drive, optionally end-to-end encrypted as a Cryptomator vault."
-version = "2.0.0"
+name = "snacknodes"
+description = "Save ComfyUI outputs to your own Google Drive, Cloudflare R2 (10 GB free) or WebDAV server (Nutstore, Nextcloud, NAS...), connected right on the node, optionally end-to-end encrypted as a Cryptomator vault."
+version = "2.0.1"
 authors = [
     {name = "svbmwjwj", email = "255624542+svbmwjwj@users.noreply.github.com"}
 ]
@@ -18,12 +18,12 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/svbmwjwj/comfyui_snacknodes"
+Repository = "https://github.com/svbmwjwj/SnackNodes"
 
 [tool.comfy]
 PublisherId = "svbmwjwj"
-DisplayName = "comfyui_snacknodes"
-Icon = "https://raw.githubusercontent.com/svbmwjwj/comfyui_snacknodes/main/web/icon.png"
+DisplayName = "SnackNodes"
+Icon = "https://raw.githubusercontent.com/svbmwjwj/SnackNodes/main/web/icon.png"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

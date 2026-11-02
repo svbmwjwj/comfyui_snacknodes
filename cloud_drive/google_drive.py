@@ -16,8 +16,9 @@ from typing import Any, Callable, Optional
 
 import requests
 
-from .base import AuthRequired, CloudDriveError, Progress, Provider, request
+from .base import AuthRequired, CloudDriveError, Progress, Provider, request, save_resume
 from .config import CredentialStore
+from .paths import AUTH_SCRIPT
 
 NAME = "google_drive"
 DISPLAY_NAME = "Google Drive"
@@ -55,7 +56,7 @@ def resolve_client(client_id: Optional[str] = None,
     return None, None, "none"
 
 
-AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py google_drive"
+AUTH_HINT = f"Run: {AUTH_SCRIPT} google_drive"
 
 
 def _escape(value: str) -> str:
@@ -168,19 +169,39 @@ class GoogleDrive(Provider):
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
                     allow_rename: bool = True,
-                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
+                    progress: Optional[Progress] = None,
+                    resume: Optional[dict[str, Any]] = None) -> tuple[str, str, Optional[str]]:
         # Drive allows duplicate names, so the name is always kept as given.
         size = os.path.getsize(local_path)
-        init = request(
-            self.session, "POST", UPLOAD_URL, sleep=self.sleep,
-            params={"uploadType": "resumable", "fields": "id,name,webViewLink"},
-            headers={**self._headers(), "X-Upload-Content-Type": mime_type,
-                     "X-Upload-Content-Length": str(size)},
-            json={"name": name, "parents": [parent_id]},
-        )
-        session_url = init.headers["Location"]
+        session_url, offset = None, 0
+        if resume is not None and resume.get("session_url") and resume.get("size") == size:
+            # An earlier try was interrupted: ask Google how much it already has (sessions last ~1 week).
+            try:
+                resp = request(self.session, "PUT", resume["session_url"], data=b"", ok=(200, 201, 308),
+                               headers={"Content-Range": f"bytes */{size}"}, sleep=self.sleep)
+            except CloudDriveError as e:
+                if e.status not in (404, 410):
+                    raise
+            else:
+                if resp.status_code in (200, 201):
+                    body = resp.json()
+                    return body["id"], body.get("name", name), body.get("webViewLink")
+                session_url = resume["session_url"]
+                received = resp.headers.get("Range")
+                offset = int(received.rsplit("-", 1)[1]) + 1 if received else 0
+        if session_url is None:
+            init = request(
+                self.session, "POST", UPLOAD_URL, sleep=self.sleep,
+                params={"uploadType": "resumable", "fields": "id,name,webViewLink"},
+                headers={**self._headers(), "X-Upload-Content-Type": mime_type,
+                         "X-Upload-Content-Length": str(size)},
+                json={"name": name, "parents": [parent_id]},
+            )
+            session_url = init.headers["Location"]
+            if resume is not None:
+                resume.update(session_url=session_url, size=size)
+                save_resume(resume)
         with open(local_path, "rb") as f:
-            offset = 0
             while True:
                 f.seek(offset)
                 chunk = f.read(CHUNK_SIZE)

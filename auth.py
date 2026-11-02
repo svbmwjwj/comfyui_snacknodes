@@ -3,11 +3,18 @@
 
   python auth.py google_drive  [--client-id ID --client-secret SECRET]
   python auth.py webdav        --url https://dav.example.com/ --username USER
+  python auth.py r2            --url https://<account>.r2.cloudflarestorage.com/<bucket>  [--limit-gb 10]
+  python auth.py s3            --endpoint https://s3.us-east-1.amazonaws.com --region us-east-1 --bucket BUCKET
   python auth.py aliyundrive   --client-id ID --client-secret SECRET
   python auth.py vault-create  google_drive  --path ComfyUI-Vault  [--generate-password]
   python auth.py vault-unlock  aliyundrive   --path ComfyUI-Vault
   python auth.py status
   python auth.py logout        google_drive
+  python auth.py uploads       [--wait] [--timeout SECONDS]
+
+`uploads --wait` waits until every background upload is done, e.g. before shutting down a rented
+GPU machine:  python custom_nodes/snacknodes/auth.py uploads --wait && shutdown
+Exit codes: 0 all uploaded, 1 some failed, 2 uploads left but ComfyUI is not running, 3 timed out.
 
 Credentials go to ~/.config/comfyui_snacknodes/cloud_drive.json (mode 600), or to
 $SNACKNODES_CONFIG_DIR. They are never written into workflows.
@@ -86,6 +93,39 @@ def auth_webdav(args, store):
     print(f"WebDAV connected: {url}")
 
 
+def auth_s3(args, store):
+    """r2 and s3: keys are checked by listing the bucket before they are stored."""
+    from cloud_drive import PROVIDERS
+    cls = PROVIDERS[args.cmd]
+    env = cls.env_prefix
+    values = {"public_url": args.public_url, "limit_gb": args.limit_gb}
+    if args.cmd == "r2":
+        from cloud_drive.s3 import parse_r2_url
+        if args.account_id:
+            values["account_id"] = args.account_id
+        else:
+            # The bucket's "S3 API" URL carries both the account and the bucket name.
+            values.update(parse_r2_url(_ask("S3 API URL (bucket → Settings → S3 API): ", args.url)))
+    else:
+        values["endpoint"] = _ask("Endpoint URL (e.g. https://s3.us-east-1.amazonaws.com): ",
+                                  args.endpoint or os.environ.get(env + "ENDPOINT"))
+        values["region"] = args.region or os.environ.get(env + "REGION") or "us-east-1"
+    values["bucket"] = _ask("Bucket name: ", args.bucket or values.get("bucket") or os.environ.get(env + "BUCKET"))
+    values["access_key_id"] = _ask("Access Key ID: ", args.access_key_id or os.environ.get(env + "ACCESS_KEY_ID"))
+    values["secret_access_key"] = (os.environ.get(env + "SECRET_ACCESS_KEY")
+                                   or getpass.getpass("Secret Access Key: ").strip())
+    provider = cls(store)
+    provider.configure(values)
+    print(f"{cls.display_name} connected: bucket '{values['bucket']}'.")
+    limit = provider.limit_bytes()
+    if limit > 0:
+        used = provider.used_bytes()
+        print(f"Bucket usage: {used / 1e9:.2f} GB of the {limit / 1e9:g} GB limit. Uploads that would go over "
+              f"are refused (change with --limit-gb, 0 = no limit).")
+    elif args.cmd == "r2":
+        print("No storage limit: storage above R2's 10 GB free tier will be billed by Cloudflare.")
+
+
 PASSWORD_WARNING = """
   !! The vault password is the ONLY way to recover your files. There is no reset
   !! and no recovery key. Save it in a password manager now.
@@ -157,6 +197,20 @@ def status(store):
     print(f"\nCredential file: {store.path}")
 
 
+def uploads(args) -> int:
+    from cloud_drive import uploads as up
+    if args.wait:
+        return up.wait_for_uploads(timeout=args.timeout)
+    data = up.read_queue()
+    lines = up.describe(data)
+    s = up.summarize(data)
+    print("\n".join(lines) if lines else "No uploads waiting.")
+    if s["active"] and not s["worker_alive"]:
+        print("ComfyUI is not running; these continue when it starts.")
+    print(f"\nQueue file: {up.queue_path()}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -170,6 +224,23 @@ def main():
     p = sub.add_parser("webdav", help="Connect a WebDAV server (Nutstore/坚果云, Nextcloud, NAS, OpenList...)")
     p.add_argument("--url")
     p.add_argument("--username")
+    for name in ("r2", "s3"):
+        r2 = name == "r2"
+        p = sub.add_parser(name, help="Connect Cloudflare R2 (10 GB free)" if r2 else
+                           "Connect S3-compatible storage (AWS S3, Backblaze B2, MinIO, Wasabi...)")
+        if r2:
+            p.add_argument("--url", help="The bucket's S3 API URL, https://<account>.r2.cloudflarestorage.com/<bucket>")
+            p.add_argument("--account-id", help="Cloudflare account ID (instead of --url)")
+        else:
+            p.add_argument("--endpoint", help="S3 endpoint URL, e.g. https://s3.us-east-1.amazonaws.com")
+            p.add_argument("--region", help="Region (default us-east-1)")
+        p.add_argument("--bucket")
+        p.add_argument("--access-key-id")
+        p.add_argument("--public-url", help="Optional public base URL (r2.dev or custom domain); "
+                                            "the node then outputs links")
+        p.add_argument("--limit-gb", type=float,
+                       help="Refuse uploads that would take the bucket over this size "
+                            + ("(default 10 = R2 free tier; 0 = no limit)" if r2 else "(default 0 = no limit)"))
     for cmd in ("vault-create", "vault-unlock"):
         p = sub.add_parser(cmd, help=f"{cmd.split('-')[1].title()} a Cryptomator vault")
         p.add_argument("provider", choices=list(PROVIDERS))
@@ -179,6 +250,9 @@ def main():
             g.add_argument("--generate-password", action="store_true", help="Generate a strong password")
             g.add_argument("--own-password", action="store_true", help="Type your own password")
     sub.add_parser("status", help="Show what is configured")
+    p = sub.add_parser("uploads", help="Show background uploads; --wait blocks until they are done")
+    p.add_argument("--wait", action="store_true", help="Wait until every upload is done (exit code 0)")
+    p.add_argument("--timeout", type=float, default=0, help="Give up waiting after this many seconds (exit 3)")
     p = sub.add_parser("logout", help="Remove stored credentials and vault keys")
     p.add_argument("provider", choices=list(PROVIDERS))
     args = ap.parse_args()
@@ -191,10 +265,14 @@ def main():
             auth_aliyun(args, store)
         elif args.cmd == "webdav":
             auth_webdav(args, store)
+        elif args.cmd in ("r2", "s3"):
+            auth_s3(args, store)
         elif args.cmd in ("vault-create", "vault-unlock"):
             vault(args, store, create=args.cmd == "vault-create")
         elif args.cmd == "status":
             status(store)
+        elif args.cmd == "uploads":
+            sys.exit(uploads(args))
         elif args.cmd == "logout":
             store.clear(args.provider)
             store.clear(f"vault:{args.provider}")

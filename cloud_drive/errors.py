@@ -13,25 +13,41 @@ from typing import Optional
 import requests
 
 from .base import AuthRequired, CloudDriveError
+from .paths import AUTH_SCRIPT
 
 AUTH_COMMANDS = {
-    "google_drive": "python custom_nodes/comfyui_snacknodes/auth.py google_drive",
-    "webdav": "python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER",
-    "aliyundrive": "python custom_nodes/comfyui_snacknodes/auth.py aliyundrive",
+    "google_drive": "{auth} google_drive",
+    "webdav": "{auth} webdav --url URL --username USER",
+    "aliyundrive": "{auth} aliyundrive",
+    "r2": "{auth} r2 --url S3_API_URL",
+    "s3": "{auth} s3 --endpoint URL --bucket BUCKET",
 }
+KEY_PROVIDERS = ("r2", "s3")
 
 # code -> (zh title, zh hint, en title, en hint). {provider}, {cmd}, {name} are filled in.
 MESSAGES: dict[str, tuple[str, str, str, str]] = {
     "not_authorized": (
         "{provider} 尚未授权，或授权已失效。",
-        "在运行 ComfyUI 的机器的终端执行：{cmd}",
+        "在顶部 SnackNodes →「网盘设置」里重新连接 {provider}；或在终端执行：{cmd}",
         "{provider} is not authorized, or the authorization has expired.",
-        "Run in a terminal on the ComfyUI machine: {cmd}"),
+        "Connect {provider} again in SnackNodes > Cloud drives (top bar), or run: {cmd}"),
     "wrong_password": (
         "{provider} 用户名或密码错误。",
-        "重新执行：{cmd}。坚果云等服务要用「应用密码」，不是登录密码。",
+        "在顶部 SnackNodes →「网盘设置」里重新填写（或执行：{cmd}）。坚果云等服务要用「应用密码」，不是登录密码。",
         "Wrong {provider} username or password.",
-        "Run again: {cmd}. Services such as Nutstore need an app password, not your login password."),
+        "Enter them again in SnackNodes > Cloud drives (top bar) (or run: {cmd}). Services such as Nutstore need an "
+        "app password, not your login password."),
+    "wrong_keys": (
+        "{provider} 的 Access Key ID 或 Secret Access Key 错误，或密钥已被删除。",
+        "重新创建 API 令牌，在顶部 SnackNodes →「网盘设置」里重新填写（或执行：{cmd}）",
+        "Wrong {provider} Access Key ID or Secret Access Key, or the key was deleted.",
+        "Create a new API token and enter it in SnackNodes > Cloud drives (top bar) (or run: {cmd})"),
+    "storage_limit": (
+        "再上传就会超过你给 {provider} 设的容量上限（Cloudflare R2 免费额度为 10 GB）。",
+        "清理存储桶里的旧文件；或在顶部 SnackNodes →「网盘设置」里修改容量上限（0 = 不限制，超出免费额度会产生费用）。",
+        "This upload would take {provider} over the storage limit you set (R2's free tier is 10 GB).",
+        "Delete old files from the bucket, or change the limit in SnackNodes > Cloud drives (top bar) "
+        "(0 = no limit; storage over the free tier is billed)."),
     "forbidden": (
         "没有权限写入这个网盘目录。",
         "检查「网盘目录」是否正确，以及账号是否有写入权限。",
@@ -45,9 +61,9 @@ MESSAGES: dict[str, tuple[str, str, str, str]] = {
         "Use another remote_folder, or rename/delete the conflicting file on the drive."),
     "not_found": (
         "在网盘上找不到目标位置。",
-        "检查「网盘目录」和 WebDAV 地址是否正确。",
+        "检查「网盘目录」、WebDAV 地址或 S3/R2 存储桶名是否正确。",
         "The target location was not found on the drive.",
-        "Check remote_folder and, for WebDAV, the server URL."),
+        "Check remote_folder and, for WebDAV, the server URL, for S3/R2, the bucket name."),
     "quota": (
         "网盘空间不足。",
         "清理网盘空间或扩容后重试。",
@@ -75,9 +91,10 @@ MESSAGES: dict[str, tuple[str, str, str, str]] = {
         "Check the network. If you need a proxy, set HTTPS_PROXY and restart ComfyUI."),
     "vault_not_configured": (
         "已开启加密，但这个网盘还没有设置保险库。",
-        "在终端执行：python custom_nodes/comfyui_snacknodes/auth.py vault-create {name}",
+        "在顶部 SnackNodes →「网盘设置」里新建或打开保险库；或在终端执行：{auth} vault-create {name}",
         "Encryption is on, but no vault is set up for this drive.",
-        "Run in a terminal: python custom_nodes/comfyui_snacknodes/auth.py vault-create {name}"),
+        "Create or open a vault in SnackNodes > Cloud drives (top bar), or run: "
+        "{auth} vault-create {name}"),
     "local_file": (
         "本地文件不存在或无法读取。",
         "检查「额外上传文件」里的路径（相对于 ComfyUI 的 output 目录）。",
@@ -93,7 +110,7 @@ MESSAGES: dict[str, tuple[str, str, str, str]] = {
 QUOTA_HINTS = ("storagequotaexceeded", "quotaexceeded", "quotaexhausted", "insufficient storage",
                "not enough space", "space not enough", "insufficientstorage")
 RATE_HINTS = ("ratelimitexceeded", "userratelimitexceeded", "too many requests", "toomanyrequests")
-TOO_LARGE_HINTS = ("filesizeexceed", "file too large", "file_size_exceed", "entity too large")
+TOO_LARGE_HINTS = ("filesizeexceed", "file too large", "file_size_exceed", "entity too large", "entitytoolarge")
 
 
 @dataclass
@@ -124,6 +141,8 @@ def classify(exc: BaseException, provider_name: str = "") -> str:
             return "vault_not_configured"
         if isinstance(e, (FileNotFoundError, PermissionError, IsADirectoryError)):
             return "local_file"
+        if type(e).__name__ == "StorageLimitReached":
+            return "storage_limit"
         if isinstance(e, requests.RequestException):
             return "network"
         if isinstance(e, CloudDriveError):
@@ -134,6 +153,8 @@ def classify(exc: BaseException, provider_name: str = "") -> str:
                 return "rate_limited"
             if status == 413 or any(h in body for h in TOO_LARGE_HINTS):
                 return "too_large"
+            if provider_name in KEY_PROVIDERS and isinstance(e, AuthRequired) and status:
+                return "wrong_keys"
             if status == 401:
                 # WebDAV uses a password; for OAuth drives a 401 means the token is no longer valid
                 return "wrong_password" if provider_name == "webdav" else "not_authorized"
@@ -156,7 +177,8 @@ def explain(exc: BaseException, provider_name: str, provider_label: str, file_na
             local_copy: str = "") -> Explanation:
     code = classify(exc, provider_name)
     zh_title, zh_hint, en_title, en_hint = MESSAGES[code]
-    fill = {"provider": provider_label, "cmd": AUTH_COMMANDS.get(provider_name, "auth.py"), "name": provider_name}
+    cmd = AUTH_COMMANDS.get(provider_name, "{auth}").format(auth=AUTH_SCRIPT)
+    fill = {"provider": provider_label, "cmd": cmd, "name": provider_name, "auth": AUTH_SCRIPT}
     zh = [zh_title.format(**fill), zh_hint.format(**fill)]
     en = [en_title.format(**fill), en_hint.format(**fill)]
     if file_name:

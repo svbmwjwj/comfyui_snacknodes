@@ -16,6 +16,7 @@ import requests
 
 from .base import AuthRequired, CloudDriveError, Progress, Provider, request
 from .config import CredentialStore
+from .paths import AUTH_SCRIPT
 
 NAME = "aliyundrive"
 DISPLAY_NAME = "Aliyun Drive"
@@ -26,7 +27,7 @@ PART_SIZE = 20 * 1024 * 1024
 URL_MAX_AGE = 50 * 60  # signed part URLs expire after ~1h; refresh early
 MAX_PARTS = 10000
 
-AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py aliyundrive"
+AUTH_HINT = f"Run: {AUTH_SCRIPT} aliyundrive"
 
 
 class AliyunDrive(Provider):
@@ -169,7 +170,8 @@ class AliyunDrive(Provider):
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
                     allow_rename: bool = True,
-                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
+                    progress: Optional[Progress] = None,
+                    resume: Optional[dict[str, Any]] = None) -> tuple[str, str, Optional[str]]:
         size = os.path.getsize(local_path)
         part_size = max(PART_SIZE, math.ceil(size / MAX_PARTS))
         n_parts = max(1, math.ceil(size / part_size))

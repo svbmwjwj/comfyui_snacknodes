@@ -28,7 +28,7 @@ class LocalProvider(Provider):
         return rel
 
     def upload_file(self, parent_id, name, local_path, mime_type="application/octet-stream", allow_rename=True,
-                    progress=None):
+                    progress=None, resume=None):
         rel = os.path.join(parent_id, name) if parent_id else name
         if os.path.exists(self._abs(rel)):
             if not allow_rename:

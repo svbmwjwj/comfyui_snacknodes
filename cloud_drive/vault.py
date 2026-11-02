@@ -11,14 +11,16 @@ import tempfile
 from typing import Optional
 
 from . import cryptomator as cm
-from .base import CloudDriveError, Progress, Provider, UploadResult, split_folder
+from .base import CloudDriveError, Progress, Provider, UploadResult, save_resume, split_folder
 from .config import CredentialStore
+from .paths import AUTH_SCRIPT
 
 class VaultNotConfigured(CloudDriveError):
     """Encryption is on but no vault was created/unlocked for this drive."""
 
 
-AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py vault-create (or vault-unlock)"
+AUTH_HINT = ("Set it up in SnackNodes > Cloud drives (top bar), or run: "
+             f"{AUTH_SCRIPT} vault-create (or vault-unlock)")
 
 
 def _store_key(provider_name: str) -> str:
@@ -130,30 +132,56 @@ class CryptomatorVault:
         return dir_id
 
     def upload(self, local_path: str, clear_folder: str, clear_name: Optional[str] = None,
-               progress: Optional[Progress] = None) -> UploadResult:
+               progress: Optional[Progress] = None, resume: Optional[dict] = None) -> UploadResult:
+        """Encrypt and upload. With a resume dict (the background queue), the encrypted copy and the
+        chosen name are kept until the upload finishes, so an interrupted upload can continue: the
+        same ciphertext must be sent again, and encrypting anew would give different bytes."""
         dir_id = self.ensure_dir(clear_folder)
         folder = self._content_dir(dir_id)
-        base = clear_name or os.path.basename(local_path)
-        stem, ext = os.path.splitext(base)
-        name, n = base, 1
-        while True:  # never overwrite: pick a free clear-text name
-            node, existing, short = self._node(folder, name, dir_id)
-            if not existing:
-                break
-            name, n = f"{stem}_{n}{ext}", n + 1
-
-        fd, tmp = tempfile.mkstemp(prefix="snack_vault_")
-        try:
+        if resume is not None and resume.get("vault_name") and resume.get("cipher") \
+                and os.path.exists(resume["cipher"]):
+            name = resume["vault_name"]
+            node, _, short = self._node(folder, name, dir_id)
+            tmp, fresh = resume["cipher"], False
+        else:
+            base = clear_name or os.path.basename(local_path)
+            stem, ext = os.path.splitext(base)
+            name, n = base, 1
+            while True:  # never overwrite: pick a free clear-text name
+                node, existing, short = self._node(folder, name, dir_id)
+                if not existing:
+                    break
+                name, n = f"{stem}_{n}{ext}", n + 1
+            cipher_dir = (resume or {}).get("cipher_dir")
+            if cipher_dir:
+                os.makedirs(cipher_dir, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(prefix="snack_vault_", dir=cipher_dir or None)
             with os.fdopen(fd, "wb") as dst, open(local_path, "rb") as src:
                 cm.encrypt_stream(self.keys, src, dst)
+            fresh = True
+            if resume is not None:
+                resume.update(vault_name=name, cipher=tmp)
+                save_resume(resume)
+        kw = {"resume": resume} if resume is not None else {}
+        finished = False
+        try:
             if short:
-                node_id = self.provider.create_folder(folder, node)
-                self._upload_bytes(node_id, "name.c9s", cm.encrypt_name(self.keys, name, dir_id).encode())
+                node_id = self.provider.find_child(folder, node) if not fresh else None
+                node_id = node_id or self.provider.create_folder(folder, node)
+                if fresh or not self.provider.find_child(node_id, "name.c9s"):
+                    self._upload_bytes(node_id, "name.c9s", cm.encrypt_name(self.keys, name, dir_id).encode())
                 file_id = self.provider.upload_file(node_id, "contents.c9r", tmp, allow_rename=False,
-                                                    progress=progress)[0]
+                                                    progress=progress, **kw)[0]
             else:
-                file_id = self.provider.upload_file(folder, node, tmp, allow_rename=False, progress=progress)[0]
+                file_id = self.provider.upload_file(folder, node, tmp, allow_rename=False, progress=progress,
+                                                    **kw)[0]
+            finished = True
         finally:
-            os.unlink(tmp)
+            # keep the ciphertext only while a resumable upload may continue it
+            if finished or resume is None:
+                try:
+                    os.unlink(tmp)
+                except FileNotFoundError:
+                    pass
         clear = "/".join(split_folder(self.vault_path) + split_folder(clear_folder) + [name])
         return UploadResult(self.provider.name, clear, file_id, encrypted=True)

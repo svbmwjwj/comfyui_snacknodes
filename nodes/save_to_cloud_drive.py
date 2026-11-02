@@ -7,19 +7,23 @@ import logging
 import mimetypes
 import os
 import re
+import shutil
+import uuid
 from datetime import datetime
 
 import numpy as np
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
-from ..cloud_drive import PROVIDERS, CloudDriveError  # noqa: F401 - re-exported for callers and tests
+from ..cloud_drive import NODE_PROVIDERS, PROVIDERS, CloudDriveError  # noqa: F401 - re-exported for tests
 from ..cloud_drive.errors import explain, ui_locale
+from ..cloud_drive.base import split_folder
+from ..cloud_drive.uploads import get_queue
 from ..cloud_drive.vault import CryptomatorVault
 
 logger = logging.getLogger(__name__)
 
-PROVIDER_LABELS = {cls.display_name: name for name, cls in PROVIDERS.items()}
+PROVIDER_LABELS = {PROVIDERS[name].display_name: name for name in NODE_PROVIDERS}
 
 
 _DATE_TOKEN = re.compile(r"%date:([^%]+)%")
@@ -69,6 +73,14 @@ def _resolve_local_file(path: str) -> str:
     if not os.path.isfile(real):
         raise FileNotFoundError(f"File not found: {path}")
     return real
+
+
+def _pending_root() -> str:
+    """Where background uploads keep files that are not kept in output/ (inside ComfyUI's user folder)."""
+    folder_paths = _folder_paths()
+    base = folder_paths.get_user_directory() if hasattr(folder_paths, "get_user_directory") \
+        else os.path.dirname(folder_paths.get_output_directory())
+    return os.path.join(base, "snacknodes_pending")
 
 
 def _mb(n: int) -> str:
@@ -121,72 +133,60 @@ class _ProgressReporter:
 
 
 class SaveToCloudDrive:
-    """Save outputs locally, then upload them to Google Drive, a WebDAV server or Aliyun Drive,
+    """Save outputs locally, then upload them to Google Drive, a WebDAV server or Cloudflare R2,
     optionally end-to-end encrypted into a Cryptomator vault."""
 
     CATEGORY = "SnackNodes"
     FUNCTION = "save_and_upload"
     OUTPUT_NODE = True
-    RETURN_TYPES = ("STRING", "BOOLEAN")
-    RETURN_NAMES = ("remote_paths", "success")
-    OUTPUT_TOOLTIPS = ("One line per uploaded file: a share link when the drive provides one, "
-                       "otherwise provider:path.",
-                       "True when every file was uploaded. With stop_on_error off, a failed upload gives False "
-                       "instead of stopping the workflow, so you can branch on it.")
+    RETURN_TYPES = ("INT",)
+    RETURN_NAMES = ("file_count",)
+    OUTPUT_TOOLTIPS = ("Number of files: uploaded (wait_for_upload on; with stop_on_error off and a failure, the "
+                       "ones done before it) or queued for upload (off). 0 when nothing was uploaded.",)
     # English texts live here; other languages in locales/<lang>/nodeDefs.json.
-    DESCRIPTION = """Upload images, a video or existing files to your own cloud drive, optionally end-to-end encrypted.
-
-One-time setup (in a terminal on the ComfyUI machine):
-  python custom_nodes/comfyui_snacknodes/auth.py google_drive
-  python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER
-  python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   (only for encrypt)
-Credentials are stored on that machine, never in the workflow.
-
-Usage
-- Connect images and/or video; pick the drive.
-- remote_folder: folder on the drive, created if missing. Date tokens:
-  ComfyUI/%date:yyyy-MM-dd%  ->  ComfyUI/2026-11-01
-  ComfyUI/%year%/%month%     ->  ComfyUI/2026/11
-- encrypt: file contents and names are encrypted before upload (Cryptomator vault);
-  open them with the Cryptomator app.
-- preview: show the images on the node after the run.
-- keep_local_copy: also keep the files in ComfyUI's output folder.
-- Advanced: filename_prefix (local file names); stop_on_error off = keep going and
-  output success = False instead of stopping the workflow.
-- Outputs: remote_paths (one line per file) and success (True/False) for automation.
-- file_paths (input): connect a text node listing files that already exist in the output
-  folder, one per line, e.g. video/ComfyUI_00001_.mp4
-Existing files are never overwritten (name_1, name_2 ...)."""
+    DESCRIPTION = ("Upload images and videos to your own cloud drive (Google Drive, WebDAV, Cloudflare R2), "
+                   "optionally end-to-end encrypted. Hover over each option for details.")
     SEARCH_ALIASES = ["upload", "google drive", "aliyun", "alipan", "cloud", "export", "backup",
                       "encrypt", "cryptomator", "webdav", "nutstore", "jianguoyun", "nextcloud",
-                      "上传", "网盘", "云盘", "备份", "加密", "坚果云"]
+                      "s3", "r2", "cloudflare", "object storage", "minio", "backblaze",
+                      "上传", "网盘", "云盘", "备份", "加密", "坚果云", "对象存储"]
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "provider": (list(PROVIDER_LABELS), {
-                    "tooltip": "Which cloud drive to upload to. Authorize it once with auth.py.",
+                    "tooltip": "Which cloud drive to upload to. Connect drives in SnackNodes > Cloud drives (top bar) "
+                               "(click the status line below).",
                 }),
                 "remote_folder": ("STRING", {
                     "default": "ComfyUI/%date:yyyy-MM-dd%",
                     "tooltip": "Folder on the drive (inside the vault when encrypting); created if missing. "
                                "Date tokens: %date:yyyy-MM-dd%, %year%, %month%, %day%, %hour%, %minute%, "
-                               "%second% (server local time). Example: ComfyUI/%date:yyyy-MM%",
+                               "%second% (server local time). Example: ComfyUI/%date:yyyy-MM%. "
+                               "Existing files are never overwritten (name_1, name_2 ...).",
                 }),
                 "encrypt": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open "
-                               "them with the Cryptomator app. Create the vault once with auth.py vault-create.",
+                               "them with the Cryptomator app. Set up the vault once in SnackNodes > Cloud drives "
+                               "(top bar).",
                 }),
                 "preview": ("BOOLEAN", {
-                    "default": True,
+                    "default": False,
                     "tooltip": "Show the saved images on the node after the run.",
                 }),
                 "keep_local_copy": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "On: also keep the files in ComfyUI's output folder. Off: use the temp folder "
-                               "(cleared when ComfyUI restarts).",
+                    "default": False,
+                    "tooltip": "On: also keep the files in ComfyUI's output folder. Off: nothing is kept in "
+                               "output; the temporary copies are deleted after the upload or when ComfyUI restarts.",
+                }),
+                "wait_for_upload": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Off (default): files upload in the background and the workflow goes on at "
+                               "once; progress shows on the node, and unfinished uploads continue after a "
+                               "restart. On: the workflow waits here until the upload is done, so the "
+                               "file_count output counts uploaded files (for automation).",
                 }),
                 "filename_prefix": ("STRING", {
                     "default": "ComfyUI", "advanced": True,
@@ -196,7 +196,9 @@ Existing files are never overwritten (name_1, name_2 ...)."""
                 "stop_on_error": ("BOOLEAN", {
                     "default": True, "advanced": True,
                     "tooltip": "On: a failed upload stops the workflow with an error. Off: the workflow "
-                               "continues and the success output is False (for automation).",
+                               "continues; the file_count output tells how many files were uploaded. With background "
+                               "uploads this only applies to setup problems found before queueing (drive not "
+                               "connected, no vault).",
                 }),
             },
             "optional": {
@@ -212,9 +214,9 @@ Existing files are never overwritten (name_1, name_2 ...)."""
             "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO", "unique_id": "UNIQUE_ID"},
         }
 
-    def save_and_upload(self, provider, remote_folder, encrypt=False, preview=True, keep_local_copy=True,
-                        filename_prefix="ComfyUI", stop_on_error=True, images=None, video=None, file_paths="",
-                        prompt=None, extra_pnginfo=None, unique_id=None):
+    def save_and_upload(self, provider, remote_folder, encrypt=False, preview=False, keep_local_copy=False,
+                        wait_for_upload=False, filename_prefix="ComfyUI", stop_on_error=True, images=None,
+                        video=None, file_paths="", prompt=None, extra_pnginfo=None, unique_id=None):
         provider_name = PROVIDER_LABELS.get(provider, provider)
         if provider_name not in PROVIDERS:
             raise ValueError(f"Unknown provider: {provider}")
@@ -234,12 +236,17 @@ Existing files are never overwritten (name_1, name_2 ...)."""
                 ui_images.append(entry)
         if video is not None:
             to_upload.append(self._save_video(video, filename_prefix, out_dir, prompt, extra_pnginfo))
+        saved = set(to_upload)  # written by this node (the rest are existing files from file_paths)
         for line in (file_paths or "").splitlines():
             if line.strip():
                 to_upload.append(_resolve_local_file(line.strip()))
 
         if not to_upload:
             raise ValueError("Nothing to upload: connect images or video, or fill in file_paths.")
+
+        if not wait_for_upload:
+            return self._queue_upload(provider, provider_name, remote_folder, encrypt, keep_local_copy,
+                                      stop_on_error, to_upload, saved, preview, ui_images, unique_id)
 
         results: list[str] = []
         failure = None
@@ -273,7 +280,53 @@ Existing files are never overwritten (name_1, name_2 ...)."""
             ui["upload_error"] = [{"code": failure.code, "zh": failure.zh, "en": failure.en, "detail": failure.detail}]
         if preview and ui_images:
             ui["images"] = ui_images
-        return {"ui": ui, "result": (text, failure is None)}
+        return {"ui": ui, "result": (len(results),)}
+
+    @staticmethod
+    def _queue_upload(label, provider_name, remote_folder, encrypt, keep_local_copy, stop_on_error, to_upload,
+                      saved, preview, ui_images, unique_id):
+        """Background mode: check the setup now (so mistakes show at once), then queue the files."""
+        try:
+            client = PROVIDERS[provider_name]()
+            if not client.is_authorized():
+                from ..cloud_drive.base import AuthRequired
+                raise AuthRequired(f"{label} is not connected")
+            if encrypt:
+                CryptomatorVault.load(client)
+        except Exception as e:  # noqa: BLE001 - explained like an upload failure
+            failure = explain(e, provider_name, label)
+            if stop_on_error:
+                raise RuntimeError(f"{failure.text(ui_locale())}\n\n{failure.detail}") from e
+            ui = {"text": [""], "upload_ok": [False], "upload_total": [len(to_upload)],
+                  "upload_error": [{"code": failure.code, "zh": failure.zh, "en": failure.en,
+                                    "detail": failure.detail}]}
+            return {"ui": ui, "result": (0,)}
+
+        files = [{"path": p, "cleanup": False} for p in to_upload]
+        pending_dir = None
+        if not keep_local_copy:
+            # ComfyUI empties its temp folder on restart: keep our own copy until it is uploaded.
+            pending_dir = os.path.join(_pending_root(), uuid.uuid4().hex[:12])
+            os.makedirs(pending_dir, exist_ok=True)
+            files = []
+            for path in to_upload:
+                if path not in saved:
+                    files.append({"path": path, "cleanup": False})
+                    continue
+                copy = os.path.join(pending_dir, os.path.basename(path))
+                try:
+                    os.link(path, copy)
+                except OSError:
+                    shutil.copy2(path, copy)
+                files.append({"path": copy, "cleanup": True})
+        job = get_queue().add(provider=provider_name, provider_label=label, remote_folder=remote_folder,
+                              encrypt=encrypt, files=files, node_id=unique_id, pending_dir=pending_dir)
+        lines = [f"{provider_name}:" + "/".join(split_folder(remote_folder) + [f["name"]]) for f in job["files"]]
+        text = "\n".join(lines)
+        ui = {"text": [text], "upload_job": [job], "upload_total": [len(lines)]}
+        if preview and ui_images:
+            ui["images"] = ui_images
+        return {"ui": ui, "result": (len(lines),)}
 
     @staticmethod
     def _save_images(images, filename_prefix, out_dir, save_type, prompt, extra_pnginfo):
