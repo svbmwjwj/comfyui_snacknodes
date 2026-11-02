@@ -5,7 +5,7 @@
     "inputs": {
       "provider": {
         "name": "provider",
-        "tooltip": "Which cloud drive to upload to. Connect it once in the panel that appears on the node."
+        "tooltip": "Which cloud drive to upload to. Connect it once in the rows that appear below it."
       },
       "remote_folder": {
         "name": "remote_folder",

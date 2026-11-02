@@ -166,7 +166,7 @@ Existing files are never overwritten (name_1, name_2 ...)."""
         return {
             "required": {
                 "provider": (list(PROVIDER_LABELS), {
-                    "tooltip": "Which cloud drive to upload to. Connect it once in the panel that appears on the node.",
+                    "tooltip": "Which cloud drive to upload to. Connect it once in the rows that appear below it.",
                 }),
                 "remote_folder": ("STRING", {
                     "default": "ComfyUI/%date:yyyy-MM-dd%",

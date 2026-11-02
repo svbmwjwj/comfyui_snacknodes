@@ -1,6 +1,6 @@
 # 开发记录与测试计划
 
-最后更新：2026-11-02 · **2.1.0 开发中：R2、节点内连接网盘** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
+最后更新：2026-11-02 · **2.1.0 开发中：R2、节点内连接网盘（原生控件）** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
 
 ## 已完成
 
@@ -36,26 +36,27 @@
 8. **用户本地实测反馈（2026-11-02，ComfyUI 0.43.2，前端 1.57.4，macOS，`comfy launch`，路径 `/Users/yuono/Developer/comfyui`）**：
    - 之前的 404：旧 ComfyUI 进程占着 8188 端口，新进程没起来。已加启动日志 `SnackNodes: drive setup routes ready` 和 404 时的中文提示（提交 `a0165b5`）。关掉旧进程后，R2 显示「✓ 已连接」，后端正常
    - **用户不满意的地方 1：连接面板的样式**。现在是 HTML 面板（`web/js/drive_setup.js`，DOM 小部件），而且节点被撑得很高、按钮被截断。用户要的是：选了某个网盘后，**直接在「网盘」下拉框下面展开几行原生控件**，样子和「网盘目录」那一行一样
-   - **用户不满意的地方 2：节点上方的标签仍显示 `comfyui_snacknodes`**。查了前端源码（`getNodeSource` / `shortenNodeName`）：这个标签取自插件**文件夹名**（`custom_nodes/<文件夹>`），只会去掉大小写完全匹配的 `ComfyUI-`/`ComfyUI_`/`Comfy-`/`Comfy_` 前缀；`pyproject.toml` 的 `DisplayName` 只影响 Registry 和 Manager 的列表。从 Registry 安装时文件夹名就是节点 ID `comfyui_snacknodes`（不可改），所以**我们改不了这个标签**。用户自己可以在设置里关掉节点来源标签。如果一定要改，只能换一个新的 Registry ID（之前讨论过的代价：老用户收不到更新）。**这一点要先跟用户确认怎么处理**
+   - **用户不满意的地方 2：节点上方的标签仍显示 `comfyui_snacknodes`**。查了前端源码（`getNodeSource` / `shortenNodeName`）：这个标签取自插件**文件夹名**（`custom_nodes/<文件夹>`），只会去掉大小写完全匹配的 `ComfyUI-`/`ComfyUI_`/`Comfy-`/`Comfy_` 前缀；`pyproject.toml` 的 `DisplayName` 只影响 Registry 和 Manager 的列表。从 Registry 安装时文件夹名就是节点 ID `comfyui_snacknodes`（不可改），所以**我们改不了这个标签**。用户自己可以在设置里关掉节点来源标签。如果一定要改，只能换一个新的 Registry ID（之前讨论过的代价：老用户收不到更新）。**待用户决定**：2026-11-02 的对话里用户把「保持现状 / 换新 ID」两个选项都列了出来，没有选定；在用户明确选择之前按「保持现状」处理（不用改任何东西）
 
-### 下一步：把连接面板改成原生控件（新对话从这里开始）
+9. **连接面板改成原生控件（2026-11-02）**：`web/js/drive_setup.js` 重写，不再用 HTML 面板（DOM 小部件）。选好网盘后，「网盘」下拉框下面直接出现几行原生控件，样子和「网盘目录」那一行一样：
+   - R2：文本控件「S3 API 地址」「访问密钥 ID」「机密访问密钥」「容量上限（GB）（可选）」+ 按钮「连接」；WebDAV：「WebDAV 地址」「用户名」「密码」+「连接」。字段、标签、默认值仍由后端 `FORMS` 提供，说明放在控件的悬停提示里
+   - Google Drive：按钮「连接 Google Drive」；授权中显示三行按钮：「① 打开 https://www.google.com/device」（点击打开）、「② 输入验证码 XXXX-XXXX（点击复制）」、「③ 登录 Google 并允许访问…」，每 3 秒刷新一次
+   - 已连接：「✓ 已连接：存储桶 xxx，上限 10 GB」（点击重新检查）、「修改连接」（Google 为「重新登录」）、「断开连接」（用 ComfyUI 自带的确认框）
+   - 结果和错误用 ComfyUI 的 toast（`app.extensionManager.toast`）；Google 授权失败时节点上留一行「⚠ 原因」，点击再次显示详情
+   - 控件名都以 `snack_` 开头，创建时就设 `serialize: false`（含 `options.serialize`），不进工作流、不进 API prompt；连接成功后整组控件被换掉，密码/机密不会留在页面上。非机密的输入（地址、用户名）在切换网盘或「修改连接」时保留
+   - 已确认的前端行为（读的是 `comfyui_frontend_package` 1.57.4 的打包代码）：`node.widgets` 是被追踪的数组，`splice` 会触发 `syncWidgetOrder` → `replaceNodeWidgetOrder`，所以插到中间后 Nodes 2.0（Vue）界面的顺序也会更新；`addCustomWidget` 只给 `serialize !== false` 的控件按位置恢复值；控件只在异步请求状态之后才加，那时节点已按工作流配置完毕，不会打乱其他控件的值。按钮文字在两种界面都取 `widget.label`
+   - 验证：用一个模拟节点在 Node.js 里跑了插入位置、切换网盘、连接后清空机密、修改连接保留草稿；`pytest` 100 个通过，`ruff` 无报错。**还没在真实 ComfyUI 里看过**（沙箱不允许运行外部下载的 ComfyUI）
+   - 措辞同步：节点提示、README、错误提示里的「连接面板」改为「连接设置 / 下面出现的几行」
 
-已确认的前端行为（读的是 `comfyui_frontend_package` 1.57 的打包代码）：
-- `serialiseWidgetValues` 会跳过 `widget.serialize === false` 的控件，并且同时保存 `widgets_values_named`（按名字）；生成 API prompt 时跳过 `options.serialize === false`。所以在「网盘」下面插入不保存的控件，不会打乱其他控件的值
-- 但 `addCustomWidget` 推入后会按位置尝试恢复值：新加的控件要**立刻**设 `serialize = false` 并重置 value
-- 前端源码里插入控件到中间位置是用 `node.widgets.splice(...)`，有的地方随后调用 `syncNodeWidgetOrder(node)`；需要在经典界面和 Nodes 2.0（Vue）界面都验证插入后能正常显示和刷新
-- 前端支持原生的 `COMFY_DYNAMICCOMBO`（选项切换时展开子输入），但子输入是正常输入，**值会存进工作流**，密钥会泄露，所以不能直接用；凭据控件必须是前端自己加、`serialize: false` 的
+### 下一步：请用户在本地测原生控件（新对话从这里开始）
 
-计划：
-1. 去掉 HTML 面板（DOM 小部件），改为在 provider 控件后面插入原生控件（`node.addWidget` 后 splice 到 provider 后面）：
-   - R2：文本控件「S3 API 地址」「访问密钥 ID」「机密访问密钥」「容量上限（GB）」+ 按钮「连接」；提示放到控件 tooltip
-   - WebDAV：「WebDAV 地址」「用户名」「密码」+「连接」
-   - Google Drive：按钮「连接 Google Drive」；授权中显示按钮「打开 https://www.google.com/device」和「验证码 XXXX-XXXX（点击复制）」，每 3 秒刷新状态
-   - 已连接：一行按钮「✓ 已连接：存储桶 xxx，上限 10 GB」，加「修改连接」「断开连接」
-   - 出错用 ComfyUI 的 toast（`app.extensionManager.toast.add`），节点上留一行简短状态
-   - 连接成功后清空密码/机密控件（原生文本控件不会遮盖密码，只在输入时可见）
-2. 后端 `cloud_drive/connect.py`、`nodes/routes.py` 不用改
-3. 测试：沙箱不允许运行外部下载的 ComfyUI，只能请用户在本地测（经典界面 + Nodes 2.0），步骤：节点目录 `git pull` → 停掉旧 ComfyUI（`lsof -ti tcp:8188 | xargs kill`）→ `comfy launch` → 浏览器 `Cmd+Shift+R`
+步骤：节点目录 `git pull` → 停掉旧 ComfyUI（`lsof -ti tcp:8188 | xargs kill`）→ `comfy launch` → 浏览器 `Cmd+Shift+R`。经典界面和 Nodes 2.0 各看一遍：
+1. 新建节点，选 R2：下拉框下面出现 4 个输入 + 「连接」，节点高度正常、按钮不被截断；已连接时是「✓ 已连接…」「修改连接」「断开连接」三行
+2. 「修改连接」→ 填错机密 → 点「连接」：右上角出现中文错误提示；填对后变回已连接
+3. 切到 WebDAV / Google Drive 再切回：控件替换正确，网盘目录等其他控件的值不变
+4. 保存工作流、刷新网页再打开：其他控件的值没有错位；工作流 JSON 里没有 `snack_` 开头的值
+5. Google Drive：「连接 Google Drive」→ 出现网址和验证码 → 授权后自动变成已连接
+6. 有问题请截图，并打开浏览器控制台看有无报错
 
 ## 已做过的需求决策
 
@@ -76,7 +77,7 @@
 
 ## 已验证
 
-- 79 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
+- 100 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
 - **ComfyUI 实机测试通过（2026-11-01）**：在云端临时环境里装了最新版 ComfyUI（提交 `6d35280`，2026-10-31；前端 1.57.6；CPU 模式）。节点加载无报错，显示名、分类、下拉选项都正确；通过 API 和网页"运行"按钮分别执行了"Empty Image → Save to Cloud Drive（WebDAV）"，状态 success，图片按日期变量传到了 WebDAV，本地副本按 `filename_prefix` 存进 `output/snack/`，节点下方显示预览图。截图流程见 Playwright 脚本（未入库）

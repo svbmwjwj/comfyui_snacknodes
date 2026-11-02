@@ -252,7 +252,7 @@ python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID 
 | 项目 | 默认值 | 说明 |
 |---|---|---|
 | 图像 / 视频 | — | 要上传的图片和/或视频 |
-| 网盘 | Google Drive | 上传到哪个存储。没连接过的网盘，选中后节点上会出现连接面板 |
+| 网盘 | Google Drive | 上传到哪个存储。没连接过的网盘，选中后下拉框下面会出现几行连接设置 |
 | 网盘目录 | `ComfyUI/%date:yyyy-MM-dd%` | 按日期自动分文件夹，见[日期变量](#-网盘目录与日期变量) |
 | 加密 | 关 | 用 Cryptomator 保险库格式端到端加密，见[加密](#-端到端加密) |
 | 预览 | 开 | 运行后在节点上显示图片 |

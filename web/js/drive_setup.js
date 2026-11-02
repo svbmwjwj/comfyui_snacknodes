@@ -1,12 +1,20 @@
-// "Connect a drive" panel on Save to Cloud Drive: when the chosen drive is not connected yet,
-// the node shows the fields it needs (or a Connect button for Google Drive). Values are sent to
-// the ComfyUI server (nodes/routes.py) and stored on that machine only: the panel is never saved
-// in the workflow, and secrets are never sent back to the page.
+// "Connect a drive" rows on Save to Cloud Drive: when the chosen drive is not connected yet, native
+// widgets for what it needs (or a Connect button for Google Drive) appear right below the drive
+// dropdown, styled like every other row. Values go to the ComfyUI server (nodes/routes.py) and are
+// stored on that machine only: these rows are never saved in the workflow (serialize: false), and
+// secrets are never sent back to the page.
+//
+// Frontend notes (checked against comfyui_frontend_package 1.57):
+// - node.widgets is a tracked array: splice() also updates the Nodes 2.0 (Vue) widget order.
+// - addCustomWidget restores a saved value by position only for widgets with serialize !== false,
+//   so each row is created with serialize: false already set.
+// - Rows are only added after an async status request, i.e. after the node was configured from a
+//   workflow, so they never shift the positions of the saved widget values.
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 
 const NODE = "SnackSaveToCloudDrive";
-const WIDGET = "drive_setup";
+const ANCHOR = "provider";
 // Dropdown label -> provider id (same as cloud_drive.NODE_PROVIDERS)
 const PROVIDERS = { "Google Drive": "google_drive", WebDAV: "webdav", "Cloudflare R2": "r2" };
 
@@ -17,42 +25,21 @@ const zh = () => {
 const t = (pair) => (pair ? (zh() ? pair.zh : pair.en) || pair.en || "" : "");
 const T = (z, e) => (zh() ? z : e);
 
-const CSS = `
-.snack-setup{font:12px/1.45 sans-serif;color:var(--input-text,#ddd);padding:6px 8px;border-radius:6px;
-  border:1px solid var(--border-color,#444);background:var(--comfy-input-bg,#222);box-sizing:border-box;
-  display:flex;flex-direction:column;gap:6px;width:100%;overflow:hidden}
-.snack-setup .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.snack-setup label{display:flex;flex-direction:column;gap:2px}
-.snack-setup input{background:var(--comfy-menu-bg,#111);color:inherit;border:1px solid var(--border-color,#555);
-  border-radius:4px;padding:4px 6px;font:inherit;width:100%;box-sizing:border-box}
-.snack-setup button{background:var(--comfy-menu-bg,#333);color:inherit;border:1px solid var(--border-color,#666);
-  border-radius:4px;padding:3px 10px;font:inherit;cursor:pointer}
-.snack-setup button.primary{background:#2f6fde;border-color:#2f6fde;color:#fff}
-.snack-setup button:disabled{opacity:.6;cursor:wait}
-.snack-setup .muted{opacity:.7}
-.snack-setup .err{color:#ff8a80;white-space:pre-wrap;word-break:break-word}
-.snack-setup .ok{color:#7ddc8a}
-.snack-setup .code{font:bold 16px monospace;letter-spacing:2px;user-select:all}
-.snack-setup a{color:#6fa8ff}
-`;
-
-function addStyle() {
-  if (document.getElementById("snack-setup-style")) return;
-  const style = document.createElement("style");
-  style.id = "snack-setup-style";
-  style.textContent = CSS;
-  document.head.appendChild(style);
+function toast(severity, summary, detail) {
+  const add = app.extensionManager?.toast?.add;
+  if (add) {
+    add.call(app.extensionManager.toast, { severity, summary, detail, life: severity === "error" ? 10000 : 4000 });
+  } else if (severity === "error") {
+    alert([summary, detail].filter(Boolean).join("\n\n"));
+  }
 }
 
-function el(tag, attrs = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "class") node.className = v;
-    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
-    else if (v !== undefined && v !== null && v !== false) node.setAttribute(k, v === true ? "" : v);
+async function confirmDialog(title, message) {
+  const dialog = app.extensionManager?.dialog;
+  if (dialog?.confirm) {
+    try { return !!(await dialog.confirm({ title, message, type: "default" })); } catch { /* fall back */ }
   }
-  for (const c of children.flat()) if (c !== null && c !== undefined) node.append(c);
-  return node;
+  return confirm(message);
 }
 
 async function call(provider, action, body) {
@@ -63,7 +50,7 @@ async function call(provider, action, body) {
   let data = {};
   try { data = await resp.json(); } catch { /* not JSON */ }
   if (resp.status === 404 && !data.error) {
-    // The page has the new panel but the server is still running older Python code.
+    // The page has the new rows but the server is still running older Python code.
     throw { zh: "ComfyUI 后端还没加载新版本的 SnackNodes：请完全重启 ComfyUI 后再刷新网页。如果重启后仍然这样，请查看启动日志里 SnackNodes 的报错。",
             en: "The ComfyUI server has not loaded the new SnackNodes yet: fully restart ComfyUI, then reload the page. If it persists, check the startup log for SnackNodes errors." };
   }
@@ -71,160 +58,211 @@ async function call(provider, action, body) {
   return data;
 }
 
-class Panel {
+const shorten = (text, max = 48) => (text.length > max ? text.slice(0, max - 1) + "…" : text);
+
+class DriveRows {
   constructor(node) {
     this.node = node;
-    this.root = el("div", { class: "snack-setup" });
+    this.rows = [];        // widgets this class added
+    this.drafts = {};      // non-secret values typed so far, kept across re-renders
     this.editing = false;
+    this.busy = false;
     this.timer = null;
-    this.widget = node.addDOMWidget(WIDGET, "snack_drive_setup", this.root, {
-      serialize: false, hideOnZoom: false,
-      getMinHeight: () => (this.root.style.display === "none" ? 0 : this.root.scrollHeight + 6),
-      getMaxHeight: () => (this.root.style.display === "none" ? 0 : this.root.scrollHeight + 6),
-    });
-    this.widget.serialize = false; // display only: never part of widgets_values
+    this.seq = 0;
+    this.status = null;
   }
 
   provider() {
-    const label = this.node.widgets?.find((w) => w.name === "provider")?.value;
-    return PROVIDERS[label];
+    return PROVIDERS[this.node.widgets?.find((w) => w.name === ANCHOR)?.value];
   }
 
-  resize() {
-    requestAnimationFrame(() => {
-      const size = this.node.computeSize?.();
-      if (size) this.node.setSize([this.node.size[0], Math.max(size[1], 0)]);
-      this.node.graph?.setDirtyCanvas(true, true);
-    });
+  // ---- widgets -------------------------------------------------------------------------------
+
+  text(key, label, { value = "", tooltip = "", placeholder = "", secret = false } = {}) {
+    return { kind: "text", key, label, value, tooltip, placeholder, secret };
   }
 
-  show(...items) {
-    const children = items.filter((c) => c !== null && c !== undefined && c !== false);
-    this.root.replaceChildren(...children);
-    this.root.style.display = children.length ? "flex" : "none";
-    this.resize();
+  button(key, label, onClick, tooltip = "") {
+    return { kind: "button", key, label, onClick, tooltip };
   }
+
+  make(spec) {
+    const name = `snack_${spec.key}`;
+    const options = { serialize: false };
+    if (spec.placeholder) options.placeholder = spec.placeholder;
+    const widget = this.node.addCustomWidget(spec.kind === "button"
+      ? { type: "button", name, label: spec.label, value: null, serialize: false, options,
+          callback: () => { if (!this.busy) spec.onClick(); } }
+      : { type: "text", name, label: spec.label, value: spec.value ?? "", serialize: false, options,
+          callback: () => {} });
+    widget.serialize = false;
+    widget.options = { ...(widget.options || {}), serialize: false };
+    if (spec.kind === "text") widget.value = spec.value ?? "";
+    if (spec.tooltip) widget.tooltip = spec.tooltip;
+    widget.snackKey = spec.key;
+    widget.snackSecret = !!spec.secret;
+    return widget;
+  }
+
+  value(key) {
+    const w = this.rows.find((r) => r.snackKey === key);
+    return w ? String(w.value ?? "").trim() : "";
+  }
+
+  setRows(specs) {
+    const node = this.node;
+    for (const w of this.rows) {
+      if (w.type === "text" && !w.snackSecret) this.drafts[w.snackKey] = w.value;
+    }
+    const before = node.computeSize?.()[1] ?? 0;
+    for (const w of this.rows) {
+      if (!node.widgets?.includes(w)) continue;
+      if (node.removeWidget) node.removeWidget(w);
+      else { w.onRemove?.(); node.widgets.splice(node.widgets.indexOf(w), 1); }
+    }
+    this.rows = specs.filter(Boolean).map((s) => this.make(s));
+    if (this.rows.length && node.widgets) {
+      // addCustomWidget appends: move the new rows right below the drive dropdown
+      const moved = node.widgets.filter((w) => this.rows.includes(w));
+      for (const w of moved) node.widgets.splice(node.widgets.indexOf(w), 1);
+      const at = node.widgets.findIndex((w) => w.name === ANCHOR) + 1 || node.widgets.length;
+      node.widgets.splice(at, 0, ...moved);
+    }
+    // grow or shrink by what changed, so a preview image below keeps its space
+    const after = node.computeSize?.()[1] ?? 0;
+    if (node.size && after) node.setSize([node.size[0], Math.max(after, node.size[1] + after - before)]);
+    node.graph?.setDirtyCanvas(true, true);
+  }
+
+  clear() {
+    clearTimeout(this.timer);
+    if (this.rows.length) this.setRows([]);
+  }
+
+  // ---- state ---------------------------------------------------------------------------------
 
   async refresh() {
     clearTimeout(this.timer);
     const provider = this.provider();
-    if (!provider) return this.show();
-    const asked = provider;
-    this.show(el("div", { class: "muted" }, T("正在检查连接…", "Checking connection…")));
+    const seq = ++this.seq;
+    if (!provider) return this.clear();
     try {
       const status = await call(provider);
-      if (this.provider() === asked) this.render(status);
+      if (seq === this.seq && this.node.graph) this.render(status);
     } catch (e) {
-      if (this.provider() === asked) this.show(el("div", { class: "err" }, t(e)), this.retryRow());
+      if (seq !== this.seq || !this.node.graph) return;
+      this.setRows([
+        this.button("error", "⚠ " + shorten(t(e)), () => toast("error", T("连接网盘", "Connect drive"), t(e)), t(e)),
+        this.button("retry", T("重试", "Retry"), () => this.refresh()),
+      ]);
     }
   }
 
-  retryRow() {
-    return el("div", { class: "row" }, el("button", { onclick: () => this.refresh() }, T("重试", "Retry")));
-  }
-
-  render(status, note) {
+  render(status) {
+    this.status = status;
+    clearTimeout(this.timer);
     const form = status.form;
-    if (status.connected && !this.editing && status.oauth?.state !== "pending") {
+    const flow = status.oauth;
+    if (flow?.state === "pending") return this.renderPending(status);
+    if (status.connected && !this.editing) {
       const summary = t(status.summary);
-      return this.show(
-        el("div", { class: "row" },
-          el("span", { class: "ok" }, "✓ " + T("已连接", "Connected")),
-          summary ? el("span", { class: "muted" }, summary) : null),
-        note && t(note) ? el("div", { class: "muted" }, t(note)) : null,
-        el("div", { class: "row" },
-          el("button", { onclick: () => { this.editing = true; this.render(status); } },
-            form.kind === "oauth" ? T("重新登录", "Sign in again") : T("修改", "Change")),
-          el("button", { onclick: (ev) => this.disconnect(ev.target) }, T("断开", "Disconnect"))),
-      );
+      const head = "✓ " + T("已连接", "Connected") + (summary ? T("：", ": ") + summary : "");
+      return this.setRows([
+        this.button("status", shorten(head, 60), () => this.refresh(),
+          head + "\n" + T("点击重新检查", "Click to check again")),
+        this.button("change", form.kind === "oauth" ? T("重新登录", "Sign in again") : T("修改连接", "Change connection"),
+          () => { this.editing = true; this.render(this.status); }),
+        this.button("disconnect", T("断开连接", "Disconnect"), () => this.disconnect()),
+      ]);
     }
-    if (form.kind === "oauth") return this.renderOAuth(status);
-    return this.renderForm(status);
+    const cancel = status.connected
+      ? this.button("cancel", T("取消修改", "Cancel"), () => { this.editing = false; this.render(this.status); })
+      : null;
+    const intro = t(form.intro) + (form.help ? "\n" + T("图文教程：", "Guide: ") + form.help : "");
+    if (form.kind === "oauth") {
+      const error = flow?.state === "error" ? flow.error : null;
+      return this.setRows([
+        this.button("oauth", T("连接 Google Drive", "Connect Google Drive"), () => this.startOAuth(), intro),
+        error ? this.errorRow(error) : null,
+        cancel,
+      ]);
+    }
+    const prefix = `${status.provider}_`;
+    this.setRows([
+      ...form.fields.map((f) => this.text(prefix + f.key,
+        t(f.label) + (f.optional ? T("（可选）", " (optional)") : ""), {
+          value: f.secret ? "" : (this.drafts[prefix + f.key] ?? f.default ?? ""),
+          placeholder: f.placeholder || "",
+          secret: f.secret,
+          tooltip: [t(f.hint), f.placeholder ? T("例如 ", "e.g. ") + f.placeholder : "",
+            f.secret ? T("输入后会在连接成功时清空，不会保存到工作流", "Cleared after connecting; never saved in the workflow") : ""]
+            .filter(Boolean).join("\n") || intro,
+        })),
+      this.button("connect", T("连接", "Connect"), () => this.connect(),
+        intro + "\n" + T("只保存在运行 ComfyUI 的机器上，不写进工作流", "Stored on the ComfyUI machine only, never in the workflow")),
+      cancel,
+    ]);
   }
 
-  header(status, form) {
-    return [
-      el("div", {}, el("b", {}, status.connected ? T("修改连接", "Change connection") : T("连接这个网盘", "Connect this drive"))),
-      el("div", { class: "muted" }, t(form.intro),
-        form.help ? [" ", el("a", { href: form.help, target: "_blank", rel: "noopener" }, T("图文教程", "Guide"))] : null),
-    ];
+  renderPending(status) {
+    const flow = status.oauth;
+    this.setRows([
+      this.button("oauth_open", T("① 打开 ", "① Open ") + flow.url, () => window.open(flow.url, "_blank", "noopener"),
+        T("可以在任意设备上打开", "Open it on any device")),
+      this.button("oauth_code", T(`② 输入验证码 ${flow.code}（点击复制）`, `② Enter code ${flow.code} (click to copy)`),
+        () => this.copy(flow.code)),
+      this.button("oauth_wait", T("③ 登录 Google 并允许访问，完成后自动更新…", "③ Sign in and allow access; updates by itself…"),
+        () => this.refresh()),
+    ]);
+    this.timer = setTimeout(() => this.poll(), 3000);
   }
 
-  renderForm(status) {
-    const form = status.form;
-    const inputs = {};
-    const error = el("div", { class: "err" });
-    const fields = form.fields.map((f) => {
-      const input = el("input", {
-        type: f.secret ? "password" : "text", placeholder: f.placeholder || "", value: f.default || "",
-        autocomplete: f.secret ? "new-password" : "off", spellcheck: "false",
-      });
-      input.addEventListener("keydown", (ev) => { ev.stopPropagation(); if (ev.key === "Enter") submit(); });
-      inputs[f.key] = input;
-      return el("label", {},
-        el("span", {}, t(f.label) + (f.optional ? T("（可选）", " (optional)") : "")),
-        input,
-        t(f.hint) ? el("span", { class: "muted" }, t(f.hint)) : null);
-    });
-    const button = el("button", { class: "primary", onclick: () => submit() }, T("连接", "Connect"));
-    const submit = async () => {
-      const values = Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value.trim()]));
-      const missing = form.fields.find((f) => !f.optional && !values[f.key]);
-      if (missing) { error.textContent = T(`请填写：${t(missing.label)}`, `Please fill in: ${t(missing.label)}`); return this.resize(); }
-      button.disabled = true;
-      button.textContent = T("正在连接…", "Connecting…");
-      error.textContent = "";
+  errorRow(error) {
+    const text = [t(error), error.detail].filter(Boolean).join("\n\n");
+    return this.button("error", "⚠ " + shorten(t(error) || T("连接失败", "Could not connect")),
+      () => toast("error", T("连接失败", "Could not connect"), text), text);
+  }
+
+  // ---- actions -------------------------------------------------------------------------------
+
+  async withBusy(key, label, fn) {
+    const w = this.rows.find((r) => r.snackKey === key);
+    const old = w?.label;
+    this.busy = true;
+    if (w) { w.label = label; this.node.graph?.setDirtyCanvas(true, true); }
+    try { return await fn(); } finally {
+      this.busy = false;
+      if (w && this.rows.includes(w)) { w.label = old; this.node.graph?.setDirtyCanvas(true, true); }
+    }
+  }
+
+  async connect() {
+    const status = this.status;
+    const prefix = `${status.provider}_`;
+    const values = Object.fromEntries(status.form.fields.map((f) => [f.key, this.value(prefix + f.key)]));
+    const missing = status.form.fields.find((f) => !f.optional && !values[f.key]);
+    if (missing) return toast("warn", T(`请填写：${t(missing.label)}`, `Please fill in: ${t(missing.label)}`));
+    await this.withBusy("connect", T("正在连接…", "Connecting…"), async () => {
       try {
         const result = await call(status.provider, "connect", values);
         this.editing = false;
-        this.render(result, result.note);
+        this.render(result);
+        toast("success", T("已连接", "Connected"), [t(result.summary), t(result.note)].filter(Boolean).join(T("，", ", ")));
       } catch (e) {
-        error.textContent = [t(e), e.detail].filter(Boolean).join("\n");
-        button.disabled = false;
-        button.textContent = T("连接", "Connect");
-        this.resize();
+        toast("error", T("连接失败", "Could not connect"), [t(e), e.detail].filter(Boolean).join("\n\n"));
       }
-    };
-    const actions = el("div", { class: "row" }, button,
-      status.connected ? el("button", { onclick: () => { this.editing = false; this.render(status); } }, T("取消", "Cancel")) : null,
-      el("span", { class: "muted" }, T("只保存在运行 ComfyUI 的机器上，不写进工作流", "Stored on the ComfyUI machine only, never in the workflow")));
-    this.show(...this.header(status, form), ...fields, actions, error);
+    });
   }
 
-  renderOAuth(status) {
-    const form = status.form;
-    const flow = status.oauth;
-    const error = el("div", { class: "err" });
-    if (flow?.state === "pending") {
-      this.timer = setTimeout(() => this.poll(), 3000);
-      return this.show(
-        el("div", {}, el("b", {}, T("在任意设备上完成登录", "Finish signing in on any device"))),
-        el("div", {}, "1. ", T("打开 ", "Open "), el("a", { href: flow.url, target: "_blank", rel: "noopener" }, flow.url)),
-        el("div", { class: "row" }, "2. " + T("输入验证码：", "Enter the code:"), el("span", { class: "code" }, flow.code)),
-        el("div", { class: "muted" }, T("3. 登录你的 Google 账号并允许访问。完成后这里会自动更新。",
-          "3. Sign in to your Google account and allow access. This panel updates by itself.")),
-      );
-    }
-    if (flow?.state === "error") {
-      error.textContent = [t(flow.error), flow.error?.detail].filter(Boolean).join("\n");
-    }
-    const button = el("button", {
-      class: "primary",
-      onclick: async () => {
-        button.disabled = true;
-        try {
-          this.editing = false;
-          this.render(await call(status.provider, "oauth"));
-        } catch (e) {
-          error.textContent = [t(e), e.detail].filter(Boolean).join("\n");
-          button.disabled = false;
-          this.resize();
-        }
-      },
-    }, T("连接 Google Drive", "Connect Google Drive"));
-    this.show(...this.header(status, form), el("div", { class: "row" }, button,
-      status.connected ? el("button", { onclick: () => { this.editing = false; this.render(status); } }, T("取消", "Cancel")) : null),
-    error);
+  async startOAuth() {
+    await this.withBusy("oauth", T("正在获取验证码…", "Getting a code…"), async () => {
+      try {
+        this.editing = false;
+        this.render(await call(this.status.provider, "oauth"));
+      } catch (e) {
+        toast("error", T("连接失败", "Could not connect"), [t(e), e.detail].filter(Boolean).join("\n\n"));
+      }
+    });
   }
 
   async poll() {
@@ -232,22 +270,37 @@ class Panel {
     if (!provider || !this.node.graph) return;
     try {
       const status = await call(provider);
-      if (this.provider() === provider) this.render(status);
+      if (this.provider() !== provider) return;
+      if (status.oauth?.state === "pending") { this.status = status; this.timer = setTimeout(() => this.poll(), 3000); return; }
+      this.render(status);
+      if (status.connected) toast("success", T("Google Drive 已连接", "Google Drive connected"));
     } catch {
       this.timer = setTimeout(() => this.poll(), 5000);
     }
   }
 
-  async disconnect(button) {
-    if (!confirm(T("断开后会删除这台机器上保存的连接信息（以及这个网盘的保险库密钥）。继续？",
-      "This removes the saved connection (and this drive's vault keys) from this machine. Continue?"))) return;
-    button.disabled = true;
+  async copy(code) {
     try {
-      this.editing = false;
-      this.render(await call(this.provider(), "disconnect"));
-    } catch (e) {
-      this.show(el("div", { class: "err" }, t(e)), this.retryRow());
+      await navigator.clipboard.writeText(code);
+      toast("info", T(`已复制验证码 ${code}`, `Copied ${code}`));
+    } catch {
+      toast("info", T(`验证码：${code}`, `Code: ${code}`));
     }
+  }
+
+  async disconnect() {
+    const ok = await confirmDialog(T("断开连接", "Disconnect"),
+      T("断开后会删除这台机器上保存的连接信息（以及这个网盘的保险库密钥）。继续？",
+        "This removes the saved connection (and this drive's vault keys) from this machine. Continue?"));
+    if (!ok) return;
+    await this.withBusy("disconnect", T("正在断开…", "Disconnecting…"), async () => {
+      try {
+        this.editing = false;
+        this.render(await call(this.provider(), "disconnect"));
+      } catch (e) {
+        toast("error", T("断开失败", "Could not disconnect"), t(e));
+      }
+    });
   }
 }
 
@@ -255,25 +308,24 @@ app.registerExtension({
   name: "SnackNodes.DriveSetup",
   async beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData.name !== NODE) return;
-    addStyle();
 
     const onNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
       const r = onNodeCreated?.apply(this, arguments);
-      const panel = new Panel(this);
-      this.snackSetup = panel;
-      const providerWidget = this.widgets?.find((w) => w.name === "provider");
+      const rows = new DriveRows(this);
+      this.snackSetup = rows;
+      const providerWidget = this.widgets?.find((w) => w.name === ANCHOR);
       if (providerWidget) {
         const callback = providerWidget.callback;
         providerWidget.callback = function () {
           const out = callback?.apply(this, arguments);
-          panel.editing = false;
-          panel.refresh();
+          rows.editing = false;
+          rows.refresh();
           return out;
         };
       }
       // after a workflow is loaded the dropdown value is set without its callback: check again then
-      setTimeout(() => panel.refresh(), 0);
+      setTimeout(() => rows.refresh(), 0);
       return r;
     };
 
