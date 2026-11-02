@@ -28,25 +28,25 @@ KEY_PROVIDERS = ("r2", "s3")
 MESSAGES: dict[str, tuple[str, str, str, str]] = {
     "not_authorized": (
         "{provider} 尚未授权，或授权已失效。",
-        "在节点上选择 {provider}，在下面出现的连接设置里重新连接；或在终端执行：{cmd}",
+        "在左侧边栏 SnackNodes 面板里重新连接 {provider}；或在终端执行：{cmd}",
         "{provider} is not authorized, or the authorization has expired.",
-        "Pick {provider} on the node and connect it with the rows that appear below it, or run: {cmd}"),
+        "Connect {provider} again in the SnackNodes sidebar tab, or run: {cmd}"),
     "wrong_password": (
         "{provider} 用户名或密码错误。",
-        "在节点的连接设置里重新填写（或执行：{cmd}）。坚果云等服务要用「应用密码」，不是登录密码。",
+        "在左侧边栏 SnackNodes 面板里重新填写（或执行：{cmd}）。坚果云等服务要用「应用密码」，不是登录密码。",
         "Wrong {provider} username or password.",
-        "Enter them again in the node's connect rows (or run: {cmd}). Services such as Nutstore need an "
+        "Enter them again in the SnackNodes sidebar tab (or run: {cmd}). Services such as Nutstore need an "
         "app password, not your login password."),
     "wrong_keys": (
         "{provider} 的 Access Key ID 或 Secret Access Key 错误，或密钥已被删除。",
-        "重新创建 API 令牌，在节点的连接设置里重新填写（或执行：{cmd}）",
+        "重新创建 API 令牌，在左侧边栏 SnackNodes 面板里重新填写（或执行：{cmd}）",
         "Wrong {provider} Access Key ID or Secret Access Key, or the key was deleted.",
-        "Create a new API token and enter it in the node's connect rows (or run: {cmd})"),
+        "Create a new API token and enter it in the SnackNodes sidebar tab (or run: {cmd})"),
     "storage_limit": (
         "再上传就会超过你给 {provider} 设的容量上限（Cloudflare R2 免费额度为 10 GB）。",
-        "清理存储桶里的旧文件；或在节点的连接设置里修改容量上限（0 = 不限制，超出免费额度会产生费用）。",
+        "清理存储桶里的旧文件；或在左侧边栏 SnackNodes 面板里修改容量上限（0 = 不限制，超出免费额度会产生费用）。",
         "This upload would take {provider} over the storage limit you set (R2's free tier is 10 GB).",
-        "Delete old files from the bucket, or change the limit in the node's connect rows "
+        "Delete old files from the bucket, or change the limit in the SnackNodes sidebar tab "
         "(0 = no limit; storage over the free tier is billed)."),
     "forbidden": (
         "没有权限写入这个网盘目录。",
@@ -91,9 +91,9 @@ MESSAGES: dict[str, tuple[str, str, str, str]] = {
         "Check the network. If you need a proxy, set HTTPS_PROXY and restart ComfyUI."),
     "vault_not_configured": (
         "已开启加密，但这个网盘还没有设置保险库。",
-        "在节点「加密」下面出现的几行里新建或打开保险库；或在终端执行：{auth} vault-create {name}",
+        "在左侧边栏 SnackNodes 面板里新建或打开保险库；或在终端执行：{auth} vault-create {name}",
         "Encryption is on, but no vault is set up for this drive.",
-        "Create or open a vault in the rows below encrypt on the node, or run: "
+        "Create or open a vault in the SnackNodes sidebar tab, or run: "
         "{auth} vault-create {name}"),
     "local_file": (
         "本地文件不存在或无法读取。",

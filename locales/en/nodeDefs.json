@@ -5,7 +5,7 @@
     "inputs": {
       "provider": {
         "name": "provider",
-        "tooltip": "Which cloud drive to upload to. Connect it once in the rows that appear below it."
+        "tooltip": "Which cloud drive to upload to. Connect drives in the SnackNodes sidebar tab (click the status line below)."
       },
       "remote_folder": {
         "name": "remote_folder",
@@ -13,7 +13,7 @@
       },
       "encrypt": {
         "name": "encrypt",
-        "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open them with the Cryptomator app. Set up the vault in the rows that appear below."
+        "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open them with the Cryptomator app. Set up the vault once in the SnackNodes sidebar tab."
       },
       "preview": {
         "name": "preview",
@@ -21,7 +21,7 @@
       },
       "keep_local_copy": {
         "name": "keep_local_copy",
-        "tooltip": "On: also keep the files in ComfyUI's output folder. Off: the files are deleted once they are uploaded."
+        "tooltip": "On: also keep the files in ComfyUI's output folder. Off: nothing is kept in output; the temporary copies are deleted after the upload or when ComfyUI restarts."
       },
       "wait_for_upload": {
         "name": "wait_for_upload",

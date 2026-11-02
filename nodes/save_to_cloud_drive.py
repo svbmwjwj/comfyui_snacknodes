@@ -159,7 +159,8 @@ class SaveToCloudDrive:
         return {
             "required": {
                 "provider": (list(PROVIDER_LABELS), {
-                    "tooltip": "Which cloud drive to upload to. Connect it once in the rows that appear below it.",
+                    "tooltip": "Which cloud drive to upload to. Connect drives in the SnackNodes sidebar tab "
+                               "(click the status line below).",
                 }),
                 "remote_folder": ("STRING", {
                     "default": "ComfyUI/%date:yyyy-MM-dd%",
@@ -171,16 +172,16 @@ class SaveToCloudDrive:
                 "encrypt": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open "
-                               "them with the Cryptomator app. Set up the vault in the rows that appear below.",
+                               "them with the Cryptomator app. Set up the vault once in the SnackNodes sidebar tab.",
                 }),
                 "preview": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Show the saved images on the node after the run.",
                 }),
                 "keep_local_copy": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "On: also keep the files in ComfyUI's output folder. Off: the files are deleted "
-                               "once they are uploaded.",
+                    "default": False,
+                    "tooltip": "On: also keep the files in ComfyUI's output folder. Off: nothing is kept in "
+                               "output; the temporary copies are deleted after the upload or when ComfyUI restarts.",
                 }),
                 "wait_for_upload": ("BOOLEAN", {
                     "default": False,
@@ -215,7 +216,7 @@ class SaveToCloudDrive:
             "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO", "unique_id": "UNIQUE_ID"},
         }
 
-    def save_and_upload(self, provider, remote_folder, encrypt=False, preview=False, keep_local_copy=True,
+    def save_and_upload(self, provider, remote_folder, encrypt=False, preview=False, keep_local_copy=False,
                         wait_for_upload=False, filename_prefix="ComfyUI", stop_on_error=True, images=None,
                         video=None, file_paths="", prompt=None, extra_pnginfo=None, unique_id=None):
         provider_name = PROVIDER_LABELS.get(provider, provider)

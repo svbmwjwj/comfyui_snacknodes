@@ -5,7 +5,7 @@
     "inputs": {
       "provider": {
         "name": "网盘",
-        "tooltip": "上传到哪个网盘。第一次使用时，在它下面出现的几行里填好并点「连接」即可。"
+        "tooltip": "上传到哪个网盘。在左侧边栏 SnackNodes 面板里连接网盘（点下面的状态行即可打开）。"
       },
       "remote_folder": {
         "name": "网盘目录",
@@ -13,7 +13,7 @@
       },
       "encrypt": {
         "name": "加密",
-        "tooltip": "上传前加密文件内容和文件名（Cryptomator 保险库格式），用 Cryptomator App 打开。打开后在下面出现的几行里新建或打开保险库。"
+        "tooltip": "上传前加密文件内容和文件名（Cryptomator 保险库格式），用 Cryptomator App 打开。保险库在左侧边栏 SnackNodes 面板里设置一次。"
       },
       "preview": {
         "name": "预览",
@@ -21,7 +21,7 @@
       },
       "keep_local_copy": {
         "name": "保留本地副本",
-        "tooltip": "开：文件同时保留在 ComfyUI 的 output 目录。关：上传完成后删除本地文件。"
+        "tooltip": "开：文件同时保留在 ComfyUI 的 output 目录。关：output 里不留文件；临时副本在上传完成后或 ComfyUI 重启时删除。"
       },
       "wait_for_upload": {
         "name": "等待上传完成",

@@ -71,6 +71,16 @@
    - **节点说明（DESCRIPTION）缩短为一句话**：ComfyUI 鼠标悬停在节点标题上就会显示说明（不是只在节点信息里），原来的长用法太乱。细节都在各项的悬停提示里；「同名文件不覆盖」移到「网盘目录」的提示里
    - 合并后要做（在 registry.comfy.org 发布者后台手动）：确认新节点 `SnackNodes` 已发布；把旧节点 `comfyui_snacknodes` 的描述改成「已改名为 SnackNodes」或标记弃用
 
+14. **按用户反馈调整布局（2026-11-02）**：
+   - **上传入口挪到顶部操作栏**（用户选：官方接口）：`upload_panel.js` 不再注册侧边栏标签，改用扩展的 `actionBarButtons`（1.57 的 `ActionBarButtons` 组件，位置由 ComfyUI 决定）。按钮上的角标「还剩几个文件 · 总进度%」（失败显示「!」）：扩展对象在 1.57 里是 `markRaw`（不会响应式更新），所以按 `aria-label` 找到渲染出来的按钮，直接往里加一个小 `span`，每次事件和每 2 秒更新一次（按钮被重新渲染后会补回来）。点按钮弹出上传队列（固定定位在按钮下方，点外面或按 Esc 关闭），内容和之前的面板一样
+   - **网盘配置全部挪到侧边栏**（用户选：节点只留下拉框和一行状态）：新的 `settings_panel.js` 注册侧边栏标签「SnackNodes」（`pi pi-cloud` 图标）。每个网盘一张卡片：状态、连接表单（密码/机密是遮盖输入框；输错时已填的内容保留在内存里，连接成功后清空）、Google 的网址和验证码（每 3 秒自动刷新）、修改/断开；卡片下方是该网盘的「🔒 加密保险库」：位置、新建/打开（沿用遮盖输入的密码弹窗）、更换。连接或保险库变化时发 `snacknodes:drives-changed`，所有节点的状态行跟着刷新
+   - 节点（`drive_setup.js` 重写）：只在「网盘」下面留一行原生按钮作为状态，例如「✓ 已连接：存储桶 comfy，上限 10 GB · 🔒 保险库 ComfyUI-Vault」「⚠ 未连接 · 点此在侧边栏连接」「⚠ 已开加密但没有保险库，点此设置」；点它打开侧边栏并高亮对应网盘（`sidebarTab.toggleSidebarTab`）。「加密」下面不再有行
+   - 公共代码放到 `web/js/snack_common.js`（语言、请求、保险库密码弹窗、打开侧边栏），ComfyUI 会把它当扩展文件加载，它自己不注册扩展
+   - **默认值按用户截图**：「保留本地副本」默认改为**关**（其余本来就一致：加密关、预览关、等待上传完成关、失败时停止开）；它的说明改为「关：output 里不留文件；临时副本在上传完成后或 ComfyUI 重启时删除」
+   - 节点提示、错误提示、README 都改为指向侧边栏 SnackNodes 面板和顶部「上传」按钮
+   - **修复：用符号链接装在 custom_nodes 里时（用户本地就是这样：开发目录链接进 ComfyUI），终端命令提示显示的是开发目录名**。`paths.py` 不再 `resolve()`，用 ComfyUI 看到的链接名；加了测试
+   - 验证：Playwright + 桩 app/api：节点状态行（未连接 → 连接 R2 → 已开加密没保险库 → 建好保险库）、点状态行打开侧边栏、遮盖输入、漏填时保留已填内容、自动生成密码建库、顶部按钮角标「1 · 25%」、弹窗打开和点外面关闭，截图核对（修了一个空占位显示成 "null" 的问题）；`pytest` 119 个通过。**还没在真实 ComfyUI 里看过**：顶部按钮的具体位置、角标样式、侧边栏图标需要用户确认
+
 ### 下一步：请用户在本地测（新对话从这里开始）
 
 本地是用 git 装的话，文件夹名不会变（标签仍是 `comfyui_snacknodes`），这是正常的；标签要等合并发布后从 Registry 装 `SnackNodes` 才会变。
@@ -84,7 +94,10 @@ GitHub 仓库已改名为 `svbmwjwj/SnackNodes`：本地克隆先执行 `git rem
 - 终端执行 `python custom_nodes/<文件夹>/auth.py uploads --wait`，看到进度，全部完成后返回 0
 - 打开「等待上传完成」：和以前一样，传完才继续，输出里有链接
 - 关闭「保留本地副本」：上传完成后 output 和 `user/snacknodes_pending/` 里都不留文件
-- 左侧边栏「上传」面板：角标数字、进度/速度、失败后重试和取消、清除已完成、浅色主题下是否看得清
+- 顶部「上传」按钮：位置、角标数字和进度、点开的上传队列（重试、取消、清除已完成）、浅色主题下是否看得清
+- 左侧边栏「SnackNodes」：连接/修改/断开网盘、Google 授权、新建和打开保险库；节点状态行是否跟着变、点它能否打开侧边栏
+- 新建节点：「保留本地副本」默认是关
+- 符号链接的本地开发目录：把 custom_nodes 里的链接改名为 SnackNodes（`mv custom_nodes/<旧链接名> custom_nodes/SnackNodes`，只改链接，不动开发目录），标签变为 SnackNodes
 
 步骤：节点目录 `git pull` → 停掉旧 ComfyUI（`lsof -ti tcp:8188 | xargs kill`）→ `comfy launch` → 浏览器 `Cmd+Shift+R`。经典界面和 Nodes 2.0 各看一遍：
 1. 打开「加密」：下面出现保险库位置和两个按钮；点「新建保险库」→ 弹窗 → 选自动生成 → 存好密码 → 输入最后一组 → 创建，节点显示「🔒 保险库：ComfyUI-Vault（已就绪）」
@@ -136,7 +149,7 @@ GitHub 仓库已改名为 `svbmwjwj/SnackNodes`：本地克隆先执行 `git rem
 
 ## 已验证
 
-- 118 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
+- 119 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
 - **ComfyUI 实机测试通过（2026-11-01）**：在云端临时环境里装了最新版 ComfyUI（提交 `6d35280`，2026-10-31；前端 1.57.6；CPU 模式）。节点加载无报错，显示名、分类、下拉选项都正确；通过 API 和网页"运行"按钮分别执行了"Empty Image → Save to Cloud Drive（WebDAV）"，状态 success，图片按日期变量传到了 WebDAV，本地副本按 `filename_prefix` 存进 `output/snack/`，节点下方显示预览图。截图流程见 Playwright 脚本（未入库）

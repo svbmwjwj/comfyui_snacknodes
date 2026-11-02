@@ -166,6 +166,7 @@ def test_layout_and_defaults(node_module):
     assert list(spec["required"]) == ["provider", "remote_folder", "encrypt", "preview", "keep_local_copy",
                                       "wait_for_upload", "filename_prefix", "stop_on_error"]
     assert spec["required"]["wait_for_upload"][1]["default"] is False
+    assert spec["required"]["keep_local_copy"][1]["default"] is False
     assert spec["required"]["remote_folder"][1]["default"] == "ComfyUI/%date:yyyy-MM-dd%"
     advanced = [k for part in ("required", "optional") for k, v in spec[part].items() if v[1].get("advanced")]
     assert advanced == ["filename_prefix", "stop_on_error", "file_paths"]

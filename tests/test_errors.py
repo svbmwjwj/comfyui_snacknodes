@@ -1,5 +1,7 @@
 """Friendly error messages for upload failures."""
 
+import os
+
 import pytest
 import requests
 
@@ -75,3 +77,17 @@ def test_retries_keep_status_or_mark_network():
     with pytest.raises(CloudDriveError) as info:
         request(s2, "GET", "https://down/", sleep=lambda x: None)
     assert info.value.network and classify(info.value) == "network"
+
+
+def test_terminal_hint_uses_the_folder_name_in_custom_nodes(tmp_path):
+    """With a symlink in custom_nodes/ the hint must show the link's name, not the target's."""
+    import subprocess
+    import sys
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    nodes = tmp_path / "custom_nodes"
+    nodes.mkdir()
+    (nodes / "SnackNodes").symlink_to(root)
+    code = "import importlib; print(importlib.import_module('SnackNodes.cloud_drive.paths').AUTH_SCRIPT)"
+    out = subprocess.run([sys.executable, "-c", code], cwd=nodes, capture_output=True, text=True,
+                         env={**os.environ, "PYTHONPATH": str(nodes)})
+    assert out.stdout.strip() == "python custom_nodes/SnackNodes/auth.py", out.stderr

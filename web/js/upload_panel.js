@@ -1,11 +1,14 @@
-// "Uploads" sidebar tab: every background upload of SnackNodes in one place, whichever workflow is
-// open and even if its node was deleted. Data: GET /snacknodes/uploads and the "snacknodes.upload"
-// websocket events of the upload queue (cloud_drive/uploads.py). The tab icon shows how many files
-// are still waiting.
+// "Uploads" button in ComfyUI's top action bar (the official actionBarButtons extension API): a badge
+// shows how many files are left and the overall progress; clicking opens a popup with every
+// background upload, whichever workflow is open and even if its node was deleted. Data:
+// GET /snacknodes/uploads and the "snacknodes.upload" websocket events of the upload queue
+// (cloud_drive/uploads.py).
+//
+// The registered button object is not reactive (extensions are markRaw), so the badge is a small
+// element added to the rendered button and refreshed on every event and every few seconds.
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 
-const TAB_ID = "snacknodes-uploads";
 
 const zh = () => {
   const locale = app.ui?.settings?.getSettingValue?.("Comfy.Locale") || navigator.language || "";
@@ -15,6 +18,12 @@ const T = (z, e) => (zh() ? z : e);
 const tr = (pair) => (pair ? (zh() ? pair.zh : pair.en) || pair.en || "" : "");
 
 const CSS = `
+.snack-up-pop{position:fixed;z-index:3000;width:min(390px,calc(100vw - 16px));max-height:72vh;display:flex;
+  background:var(--comfy-menu-bg,#1e1e1e);border:1px solid var(--border-color,#444);border-radius:10px;
+  box-shadow:0 12px 40px rgba(0,0,0,.45);overflow:hidden}
+.snack-up-pop .snack-up{max-height:72vh;width:100%}
+.snack-up-badge{margin-left:6px;font-size:11px;padding:0 6px;border-radius:999px;background:#2f6fde;color:#fff;line-height:16px}
+.snack-up-badge.failed{background:#d9534f}
 .snack-up{display:flex;flex-direction:column;height:100%;font:13px/1.45 sans-serif;color:var(--fg-color,#ddd)}
 .snack-up-head{padding:12px 14px;border-bottom:1px solid var(--border-color,#444);display:flex;flex-direction:column;gap:8px}
 .snack-up-head h3{margin:0;font-size:15px;font-weight:600}
@@ -124,13 +133,49 @@ class Panel {
   }
 
   updateBadge() {
-    const left = this.active().reduce((n, j) => n + j.files.filter((f) => f.state !== "done").length, 0);
+    const active = this.active();
+    const left = active.reduce((n, j) => n + j.files.filter((f) => f.state !== "done").length, 0);
+    const total = active.reduce((n, j) => n + j.total, 0);
+    const sent = active.reduce((n, j) => n + j.sent, 0);
     const failed = [...this.jobs.values()].some((j) => j.state === "failed");
-    const badge = left ? String(left) : failed ? "!" : null;
-    // the registered tab object is reactive inside the sidebar store: changing it re-renders the icon
-    const tabs = app.extensionManager?.getSidebarTabs?.() || app.extensionManager?.sidebarTab?.sidebarTabs || [];
-    const tab = tabs.find?.((t) => t.id === TAB_ID);
-    if (tab && tab.iconBadge !== badge) tab.iconBadge = badge;
+    const text = left ? `${left} · ${total ? Math.floor((100 * sent) / total) : 0}%` : failed ? "!" : "";
+    const button = findButton();
+    if (!button) return;
+    let badge = button.querySelector(".snack-up-badge");
+    if (!badge) {
+      badge = h("span", { class: "snack-up-badge" });
+      button.append(badge);
+    }
+    badge.textContent = text;
+    badge.className = "snack-up-badge" + (!left && failed ? " failed" : "");
+    badge.style.display = text ? "" : "none";
+  }
+
+  toggle(event) {
+    if (this.pop) return this.close();
+    const anchor = event?.currentTarget instanceof Element ? event.currentTarget : findButton();
+    const rect = anchor?.getBoundingClientRect?.() || { left: window.innerWidth - 400, bottom: 48, right: window.innerWidth - 8 };
+    const width = Math.min(390, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+    this.pop = h("div", { class: "snack-up-pop", style: `top:${Math.round(rect.bottom + 8)}px;left:${Math.round(left)}px` });
+    document.body.append(this.pop);
+    this.mount(this.pop);
+    this.outside = (ev) => {
+      if (this.pop && !this.pop.contains(ev.target) && !findButton()?.contains(ev.target)) this.close();
+    };
+    this.escape = (ev) => { if (ev.key === "Escape") this.close(); };
+    setTimeout(() => {
+      document.addEventListener("mousedown", this.outside, true);
+      document.addEventListener("keydown", this.escape, true);
+    }, 0);
+  }
+
+  close() {
+    document.removeEventListener("mousedown", this.outside, true);
+    document.removeEventListener("keydown", this.escape, true);
+    this.pop?.remove();
+    this.pop = null;
+    this.unmount();
   }
 
   async post(path, okText) {
@@ -150,7 +195,7 @@ class Panel {
 
   // ---- view ----------------------------------------------------------------------------------
   mount(el) {
-    if (!document.getElementById("snack-up-style")) document.head.append(h("style", { id: "snack-up-style" }, CSS));
+    addStyle();
     this.root = h("div", { class: "snack-up" });
     el.replaceChildren(this.root);
     this.draw();
@@ -241,26 +286,35 @@ class Panel {
   }
 }
 
+function addStyle() {
+  if (!document.getElementById("snack-up-style")) document.head.append(h("style", { id: "snack-up-style" }, CSS));
+}
+
+// fixed once at load: findButton() matches the rendered button by this exact aria-label
+const TOOLTIP = T("SnackNodes 上传队列", "SnackNodes uploads");
+
+function findButton() {
+  const label = TOOLTIP;
+  return [...document.querySelectorAll('[data-testid="action-bar-buttons"] button, button[aria-label]')]
+    .find((b) => b.getAttribute("aria-label") === label) || null;
+}
+
 const panel = new Panel();
 
 app.registerExtension({
   name: "SnackNodes.UploadPanel",
+  actionBarButtons: [{
+    icon: "pi pi-cloud-upload",
+    label: T("上传", "Uploads"),
+    tooltip: TOOLTIP,
+    onClick: (event) => panel.toggle(event),
+  }],
   setup() {
-    const manager = app.extensionManager;
-    if (!manager?.registerSidebarTab) return; // very old frontend: the node still shows its uploads
-    manager.registerSidebarTab({
-      id: TAB_ID,
-      icon: "pi pi-cloud-upload",
-      title: T("上传", "Uploads"),
-      label: T("上传", "Uploads"),
-      tooltip: T("SnackNodes 上传队列", "SnackNodes uploads"),
-      iconBadge: null,
-      type: "custom",
-      render: (el) => panel.mount(el),
-      destroy: () => panel.unmount(),
-    });
+    addStyle();
     api.addEventListener("snacknodes.upload", ({ detail }) => panel.onEvent(detail));
     api.addEventListener("reconnected", () => panel.load());
     panel.load();
+    // the action bar may be re-rendered (layout or size changes): put the badge back
+    setInterval(() => panel.updateBadge(), 2000);
   },
 });
