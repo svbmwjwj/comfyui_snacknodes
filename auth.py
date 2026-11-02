@@ -13,7 +13,7 @@
   python auth.py uploads       [--wait] [--timeout SECONDS]
 
 `uploads --wait` waits until every background upload is done, e.g. before shutting down a rented
-GPU machine:  python custom_nodes/SnackNodes/auth.py uploads --wait && shutdown
+GPU machine:  python custom_nodes/snacknodes/auth.py uploads --wait && shutdown
 Exit codes: 0 all uploaded, 1 some failed, 2 uploads left but ComfyUI is not running, 3 timed out.
 
 Credentials go to ~/.config/comfyui_snacknodes/cloud_drive.json (mode 600), or to

@@ -91,6 +91,17 @@ class StatusRow {
 
 app.registerExtension({
   name: "SnackNodes.DriveStatus",
+  // The node's source label ("badge") shows the folder name in custom_nodes/, which is lowercase
+  // "snacknodes" (the Registry ID; also what git clone and symlinks usually give). Show the brand
+  // name instead, whatever the folder is called. python_module is otherwise only used to group
+  // nodes by pack and to look for node docs, and is not saved in workflows.
+  beforeRegisterVueAppNodeDefs(defs) {
+    for (const def of defs) {
+      if (def?.name === NODE && String(def.python_module || "").startsWith("custom_nodes.")) {
+        def.python_module = "custom_nodes.SnackNodes";
+      }
+    }
+  },
   setup() {
     // a drive or vault changed in the sidebar: update every node's status line
     window.addEventListener(CHANGED, () => {

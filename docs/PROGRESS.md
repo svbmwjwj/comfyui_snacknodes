@@ -81,6 +81,12 @@
    - **修复：用符号链接装在 custom_nodes 里时（用户本地就是这样：开发目录链接进 ComfyUI），终端命令提示显示的是开发目录名**。`paths.py` 不再 `resolve()`，用 ComfyUI 看到的链接名；加了测试
    - 验证：Playwright + 桩 app/api：节点状态行（未连接 → 连接 R2 → 已开加密没保险库 → 建好保险库）、点状态行打开侧边栏、遮盖输入、漏填时保留已填内容、自动生成密码建库、顶部按钮角标「1 · 25%」、弹窗打开和点外面关闭，截图核对（修了一个空占位显示成 "null" 的问题）；`pytest` 119 个通过。**还没在真实 ComfyUI 里看过**：顶部按钮的具体位置、角标样式、侧边栏图标需要用户确认
 
+15. **命名最终方案（2026-11-02，用户要求：GitHub 显示 SnackNodes、克隆/下载的文件夹叫 snacknodes、ComfyUI 里显示 SnackNodes）**：
+   - **Registry 节点 ID 改为全小写 `snacknodes`**（`pyproject.toml` 的 `name`；还没发布过，所以还能改；`DisplayName` 仍是 `SnackNodes`，Manager 列表里显示这个）。Registry/Manager/comfy-cli 安装的文件夹名就是 ID → `custom_nodes/snacknodes`；`git clone https://github.com/svbmwjwj/snacknodes`（GitHub 网址不区分大小写）也得到 `snacknodes`。GitHub 上仓库名仍显示 `SnackNodes`
+   - **节点来源标签固定显示 SnackNodes，与文件夹名无关**：`drive_setup.js` 用前端的 `beforeRegisterVueAppNodeDefs` 钩子（1.57 在把节点定义放进 store 之前调用）把本节点的 `python_module` 改为 `custom_nodes.SnackNodes`。标签由 `getNodeSource(python_module)` 得出；`python_module` 另外只用于按插件分组节点和查找节点文档（`/extensions/<名字>/docs/...`，我们没有文档），不写进工作流。符号链接叫什么名字都行
+   - README、主页、`auth.py` 说明里的命令路径统一为 `custom_nodes/snacknodes/...`；Registry 徽章链接改为 `nodes/snacknodes`；「从 2.0.0 升级」改为卸载 `comfyui_snacknodes`、安装 SnackNodes（ID `snacknodes`）
+   - 取代第 11 条里「ID 为 `SnackNodes`」的说法。重名判断本来就不区分大小写，`snacknodes` 和 `SnackNodes` 在 Registry 看来是同一个名字
+
 ### 下一步：请用户在本地测（新对话从这里开始）
 
 本地是用 git 装的话，文件夹名不会变（标签仍是 `comfyui_snacknodes`），这是正常的；标签要等合并发布后从 Registry 装 `SnackNodes` 才会变。
@@ -97,7 +103,7 @@ GitHub 仓库已改名为 `svbmwjwj/SnackNodes`：本地克隆先执行 `git rem
 - 顶部「上传」按钮：位置、角标数字和进度、点开的上传队列（重试、取消、清除已完成）、浅色主题下是否看得清
 - 左侧边栏「SnackNodes」：连接/修改/断开网盘、Google 授权、新建和打开保险库；节点状态行是否跟着变、点它能否打开侧边栏
 - 新建节点：「保留本地副本」默认是关
-- 符号链接的本地开发目录：把 custom_nodes 里的链接改名为 SnackNodes（`mv custom_nodes/<旧链接名> custom_nodes/SnackNodes`，只改链接，不动开发目录），标签变为 SnackNodes
+- 节点来源标签显示 SnackNodes（不用改符号链接的名字；想统一的话可以把链接改名为 snacknodes）
 
 步骤：节点目录 `git pull` → 停掉旧 ComfyUI（`lsof -ti tcp:8188 | xargs kill`）→ `comfy launch` → 浏览器 `Cmd+Shift+R`。经典界面和 Nodes 2.0 各看一遍：
 1. 打开「加密」：下面出现保险库位置和两个按钮；点「新建保险库」→ 弹窗 → 选自动生成 → 存好密码 → 输入最后一组 → 创建，节点显示「🔒 保险库：ComfyUI-Vault（已就绪）」
