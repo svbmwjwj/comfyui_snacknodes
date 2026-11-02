@@ -1,6 +1,6 @@
 # 开发记录与测试计划
 
-最后更新：2026-11-02 · **2.0.1 发布中（新 Registry ID `snacknodes`）：R2、网盘设置和上传队列（顶部 SnackNodes 按钮）、后台上传** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
+最后更新：2026-11-02 · **2.0.1 已发布到 Comfy Registry（新 ID `snacknodes`，2026-11-02）** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
 
 ## 已完成
 
@@ -101,6 +101,7 @@
 18. **只保留一个输出「上传文件数」（2026-11-02，用户：名字不直观，先去掉布尔）**：`RETURN_TYPES = ("INT",)`，`RETURN_NAMES = ("file_count",)`，中文「上传文件数」。含义同第 17 条的「文件数」；「失败时停止」的说明改为关掉后可用这个输出判断传了几个。旧工作流里连在输出上的线需要重新连
 
 19. **发布 2.0.1（2026-11-02，用户确认可以发布，版本号按用户要求为 2.0.1，原计划的 2.1.0 未发布过）**：`pyproject.toml` 版本改为 2.0.1，开 PR 合并到 main，由 `publish_action.yml` 发布到新 ID `snacknodes`。合并后要在 registry.comfy.org 后台：确认 `snacknodes` 2.0.1 已发布；把旧 `comfyui_snacknodes` 的说明改为已改名或标记弃用
+   - **已完成（2026-11-02）**：[PR #4](https://github.com/svbmwjwj/SnackNodes/pull/4) 合并到 main（合并提交 `e5057f3`），CI build 通过；`validate`（node-diff）照旧因加载 main 时缺 numpy 失败，已在 PR 上留言说明。`publish_action.yml` 运行成功，2.0.1 发布到 `snacknodes`。用户已在 registry.comfy.org 后台确认 2.0.1，并更新了旧节点 `comfyui_snacknodes` 的说明/弃用状态
 
 ### 下一步：请用户在本地测（新对话从这里开始）
 
