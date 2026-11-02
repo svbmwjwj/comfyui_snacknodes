@@ -85,6 +85,7 @@
    - **Registry 节点 ID 改为全小写 `snacknodes`**（`pyproject.toml` 的 `name`；还没发布过，所以还能改；`DisplayName` 仍是 `SnackNodes`，Manager 列表里显示这个）。Registry/Manager/comfy-cli 安装的文件夹名就是 ID → `custom_nodes/snacknodes`；`git clone https://github.com/svbmwjwj/snacknodes`（GitHub 网址不区分大小写）也得到 `snacknodes`。GitHub 上仓库名仍显示 `SnackNodes`
    - **节点来源标签固定显示 SnackNodes，与文件夹名无关**：`drive_setup.js` 用前端的 `beforeRegisterVueAppNodeDefs` 钩子（1.57 在把节点定义放进 store 之前调用）把本节点的 `python_module` 改为 `custom_nodes.SnackNodes`。标签由 `getNodeSource(python_module)` 得出；`python_module` 另外只用于按插件分组节点和查找节点文档（`/extensions/<名字>/docs/...`，我们没有文档），不写进工作流。符号链接叫什么名字都行
    - README、主页、`auth.py` 说明里的命令路径统一为 `custom_nodes/snacknodes/...`；Registry 徽章链接改为 `nodes/snacknodes`；「从 2.0.0 升级」改为卸载 `comfyui_snacknodes`、安装 SnackNodes（ID `snacknodes`）
+   - **用户已在 registry.comfy.org 确认 `snacknodes` 没被占用（2026-11-02）**，合并到 main 后由 `publish_action.yml` 首次发布
    - 取代第 11 条里「ID 为 `SnackNodes`」的说法。重名判断本来就不区分大小写，`snacknodes` 和 `SnackNodes` 在 Registry 看来是同一个名字
 
 ### 下一步：请用户在本地测（新对话从这里开始）
