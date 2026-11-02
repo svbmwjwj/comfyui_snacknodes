@@ -25,7 +25,7 @@
       },
       "wait_for_upload": {
         "name": "wait_for_upload",
-        "tooltip": "Off (default): files upload in the background and the workflow goes on at once; progress shows on the node, and unfinished uploads continue after a restart. On: the workflow waits here until the upload is done, so the remote_paths / success outputs can be used for automation."
+        "tooltip": "Off (default): files upload in the background and the workflow goes on at once; progress shows on the node, and unfinished uploads continue after a restart. On: the workflow waits here until the upload is done, so the file_count output counts uploaded files (for automation)."
       },
       "filename_prefix": {
         "name": "filename_prefix",
@@ -33,7 +33,7 @@
       },
       "stop_on_error": {
         "name": "stop_on_error",
-        "tooltip": "On: a failed upload stops the workflow with an error. Off: the workflow continues and the success output is False (for automation). With background uploads this only applies to setup problems found before queueing (drive not connected, no vault)."
+        "tooltip": "On: a failed upload stops the workflow with an error. Off: the workflow continues; the file_count output tells how many files were uploaded. With background uploads this only applies to setup problems found before queueing (drive not connected, no vault)."
       },
       "images": {
         "name": "images",
@@ -50,12 +50,8 @@
     },
     "outputs": {
       "0": {
-        "name": "success",
-        "tooltip": "With wait_for_upload on: True when every file was uploaded (with stop_on_error off, a failed upload gives False instead of stopping the workflow). Off: True once the files are queued for upload."
-      },
-      "1": {
-        "name": "count",
-        "tooltip": "Number of files: uploaded (wait_for_upload on; with stop_on_error off and a failure, the ones done before it) or queued for upload (off)."
+        "name": "file_count",
+        "tooltip": "Number of files: uploaded (wait_for_upload on; with stop_on_error off and a failure, the ones done before it) or queued for upload (off). 0 when nothing was uploaded."
       }
     }
   }

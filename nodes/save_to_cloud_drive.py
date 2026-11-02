@@ -139,13 +139,10 @@ class SaveToCloudDrive:
     CATEGORY = "SnackNodes"
     FUNCTION = "save_and_upload"
     OUTPUT_NODE = True
-    RETURN_TYPES = ("BOOLEAN", "INT")
-    RETURN_NAMES = ("success", "count")
-    OUTPUT_TOOLTIPS = ("With wait_for_upload on: True when every file was uploaded (with stop_on_error off, a "
-                       "failed upload gives False instead of stopping the workflow). Off: True once the files "
-                       "are queued for upload.",
-                       "Number of files: uploaded (wait_for_upload on; with stop_on_error off and a failure, the "
-                       "ones done before it) or queued for upload (off).")
+    RETURN_TYPES = ("INT",)
+    RETURN_NAMES = ("file_count",)
+    OUTPUT_TOOLTIPS = ("Number of files: uploaded (wait_for_upload on; with stop_on_error off and a failure, the "
+                       "ones done before it) or queued for upload (off). 0 when nothing was uploaded.",)
     # English texts live here; other languages in locales/<lang>/nodeDefs.json.
     DESCRIPTION = ("Upload images and videos to your own cloud drive (Google Drive, WebDAV, Cloudflare R2), "
                    "optionally end-to-end encrypted. Hover over each option for details.")
@@ -189,7 +186,7 @@ class SaveToCloudDrive:
                     "tooltip": "Off (default): files upload in the background and the workflow goes on at "
                                "once; progress shows on the node, and unfinished uploads continue after a "
                                "restart. On: the workflow waits here until the upload is done, so the "
-                               "remote_paths / success outputs can be used for automation.",
+                               "file_count output counts uploaded files (for automation).",
                 }),
                 "filename_prefix": ("STRING", {
                     "default": "ComfyUI", "advanced": True,
@@ -199,7 +196,7 @@ class SaveToCloudDrive:
                 "stop_on_error": ("BOOLEAN", {
                     "default": True, "advanced": True,
                     "tooltip": "On: a failed upload stops the workflow with an error. Off: the workflow "
-                               "continues and the success output is False (for automation). With background "
+                               "continues; the file_count output tells how many files were uploaded. With background "
                                "uploads this only applies to setup problems found before queueing (drive not "
                                "connected, no vault).",
                 }),
@@ -283,7 +280,7 @@ class SaveToCloudDrive:
             ui["upload_error"] = [{"code": failure.code, "zh": failure.zh, "en": failure.en, "detail": failure.detail}]
         if preview and ui_images:
             ui["images"] = ui_images
-        return {"ui": ui, "result": (failure is None, len(results))}
+        return {"ui": ui, "result": (len(results),)}
 
     @staticmethod
     def _queue_upload(label, provider_name, remote_folder, encrypt, keep_local_copy, stop_on_error, to_upload,
@@ -303,7 +300,7 @@ class SaveToCloudDrive:
             ui = {"text": [""], "upload_ok": [False], "upload_total": [len(to_upload)],
                   "upload_error": [{"code": failure.code, "zh": failure.zh, "en": failure.en,
                                     "detail": failure.detail}]}
-            return {"ui": ui, "result": (False, 0)}
+            return {"ui": ui, "result": (0,)}
 
         files = [{"path": p, "cleanup": False} for p in to_upload]
         pending_dir = None
@@ -329,7 +326,7 @@ class SaveToCloudDrive:
         ui = {"text": [text], "upload_job": [job], "upload_total": [len(lines)]}
         if preview and ui_images:
             ui["images"] = ui_images
-        return {"ui": ui, "result": (True, len(lines))}
+        return {"ui": ui, "result": (len(lines),)}
 
     @staticmethod
     def _save_images(images, filename_prefix, out_dir, save_type, prompt, extra_pnginfo):
