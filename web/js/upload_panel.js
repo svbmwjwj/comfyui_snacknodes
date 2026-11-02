@@ -1,6 +1,7 @@
-// "Uploads" button in ComfyUI's top action bar (the official actionBarButtons extension API): a badge
-// shows how many files are left and the overall progress; clicking opens a popup with every
-// background upload, whichever workflow is open and even if its node was deleted. Data:
+// "SnackNodes" button in ComfyUI's top action bar (the official actionBarButtons extension API): a badge
+// shows how many files are left and the overall progress; clicking opens one popup with two tabs,
+// the upload queue (every background upload, whichever workflow is open and even if its node was
+// deleted) and the drive settings (settings_panel.js). Nothing is added to the sidebar. Data:
 // GET /snacknodes/uploads and the "snacknodes.upload" websocket events of the upload queue
 // (cloud_drive/uploads.py).
 //
@@ -8,6 +9,8 @@
 // element added to the rendered button and refreshed on every event and every few seconds.
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
+import { settingsPanel } from "./settings_panel.js";
+import { OPEN } from "./snack_common.js";
 
 
 const zh = () => {
@@ -18,14 +21,21 @@ const T = (z, e) => (zh() ? z : e);
 const tr = (pair) => (pair ? (zh() ? pair.zh : pair.en) || pair.en || "" : "");
 
 const CSS = `
-.snack-up-pop{position:fixed;z-index:3000;width:min(390px,calc(100vw - 16px));max-height:72vh;display:flex;
-  background:var(--comfy-menu-bg,#1e1e1e);border:1px solid var(--border-color,#444);border-radius:10px;
-  box-shadow:0 12px 40px rgba(0,0,0,.45);overflow:hidden}
-.snack-up-pop .snack-up{max-height:72vh;width:100%}
+.snack-up-pop{position:fixed;z-index:1100;width:min(400px,calc(100vw - 16px));max-height:min(78vh,760px);display:flex;
+  flex-direction:column;background:var(--comfy-menu-bg,#1e1e1e);border:1px solid var(--border-color,#444);border-radius:10px;
+  box-shadow:0 12px 40px rgba(0,0,0,.45);overflow:hidden;color:var(--fg-color,#ddd)}
+.snack-pop-tabs{display:flex;align-items:center;gap:4px;padding:8px 8px 0;border-bottom:1px solid var(--border-color,#444)}
+.snack-pop-tabs button{background:transparent;color:inherit;border:none;border-bottom:2px solid transparent;
+  padding:6px 10px 7px;font:600 13px sans-serif;cursor:pointer;opacity:.7}
+.snack-pop-tabs button.on{opacity:1;border-bottom-color:#4ea1ff}
+.snack-pop-tabs .x{margin-left:auto;font-weight:400;font-size:16px;padding:2px 8px}
+.snack-pop-body{flex:1;min-height:0;overflow:auto}
+.snack-pop-body .snack-up,.snack-pop-body .snack-set{height:auto}
+.snack-pop-body .snack-up-list{overflow:visible}
 .snack-up-badge{margin-left:6px;font-size:11px;padding:0 6px;border-radius:999px;background:#2f6fde;color:#fff;line-height:16px}
 .snack-up-badge.failed{background:#d9534f}
 .snack-up{display:flex;flex-direction:column;height:100%;font:13px/1.45 sans-serif;color:var(--fg-color,#ddd)}
-.snack-up-head{padding:12px 14px;border-bottom:1px solid var(--border-color,#444);display:flex;flex-direction:column;gap:8px}
+.snack-up-head{padding:10px 14px;border-bottom:1px solid var(--border-color,#444);display:flex;flex-direction:column;gap:8px}
 .snack-up-head h3{margin:0;font-size:15px;font-weight:600}
 .snack-up-sum{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .snack-up-list{flex:1;overflow:auto;padding:8px 10px;display:flex;flex-direction:column;gap:8px}
@@ -151,33 +161,6 @@ class Panel {
     badge.style.display = text ? "" : "none";
   }
 
-  toggle(event) {
-    if (this.pop) return this.close();
-    const anchor = event?.currentTarget instanceof Element ? event.currentTarget : findButton();
-    const rect = anchor?.getBoundingClientRect?.() || { left: window.innerWidth - 400, bottom: 48, right: window.innerWidth - 8 };
-    const width = Math.min(390, window.innerWidth - 16);
-    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
-    this.pop = h("div", { class: "snack-up-pop", style: `top:${Math.round(rect.bottom + 8)}px;left:${Math.round(left)}px` });
-    document.body.append(this.pop);
-    this.mount(this.pop);
-    this.outside = (ev) => {
-      if (this.pop && !this.pop.contains(ev.target) && !findButton()?.contains(ev.target)) this.close();
-    };
-    this.escape = (ev) => { if (ev.key === "Escape") this.close(); };
-    setTimeout(() => {
-      document.addEventListener("mousedown", this.outside, true);
-      document.addEventListener("keydown", this.escape, true);
-    }, 0);
-  }
-
-  close() {
-    document.removeEventListener("mousedown", this.outside, true);
-    document.removeEventListener("keydown", this.escape, true);
-    this.pop?.remove();
-    this.pop = null;
-    this.unmount();
-  }
-
   async post(path, okText) {
     try {
       const resp = await api.fetchApi(`/snacknodes/uploads/${path}`, { method: "POST" });
@@ -215,7 +198,6 @@ class Panel {
     const speed = active.reduce((n, j) => n + this.rate(j), 0);
     const anyDone = jobs.some((j) => j.state === "done");
     const head = h("div", { class: "snack-up-head" },
-      h("h3", {}, T("上传队列", "Uploads")),
       h("div", { class: "snack-up-sum" },
         h("span", {}, left
           ? T(`还剩 ${left} 个文件 · ${mb(bytes)}`, `${left} file(s) left · ${mb(bytes)}`) +
@@ -291,7 +273,7 @@ function addStyle() {
 }
 
 // fixed once at load: findButton() matches the rendered button by this exact aria-label
-const TOOLTIP = T("SnackNodes 上传队列", "SnackNodes uploads");
+const TOOLTIP = T("SnackNodes：上传队列和网盘设置", "SnackNodes: uploads and cloud drives");
 
 function findButton() {
   const label = TOOLTIP;
@@ -301,18 +283,80 @@ function findButton() {
 
 const panel = new Panel();
 
+// The popup: one place for the upload queue and the drive settings.
+const popup = {
+  el: null,
+  tab: "uploads",
+
+  open(tab, provider, event) {
+    addStyle();
+    if (!this.el) {
+      const anchor = event?.currentTarget instanceof Element ? event.currentTarget : findButton();
+      const rect = anchor?.getBoundingClientRect?.() || { bottom: 48, right: window.innerWidth - 8 };
+      const width = Math.min(400, window.innerWidth - 16);
+      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+      this.el = h("div", { class: "snack-up-pop", style: `top:${Math.round(rect.bottom + 8)}px;left:${Math.round(left)}px` });
+      document.body.append(this.el);
+      document.addEventListener("mousedown", this.outside, true);
+      document.addEventListener("keydown", this.escape, true);
+    }
+    this.show(tab || this.tab);
+    if (provider) settingsPanel.focus(provider);
+  },
+
+  show(tab) {
+    this.tab = tab;
+    panel.unmount();
+    settingsPanel.unmount();
+    const left = panel.active().reduce((n, j) => n + j.files.filter((f) => f.state !== "done").length, 0);
+    const tabButton = (id, label) => h("button", { class: this.tab === id ? "on" : "", onclick: () => this.show(id) }, label);
+    const body = h("div", { class: "snack-pop-body" });
+    this.el.replaceChildren(
+      h("div", { class: "snack-pop-tabs" },
+        tabButton("uploads", T("上传队列", "Uploads") + (left ? ` (${left})` : "")),
+        tabButton("settings", T("网盘设置", "Cloud drives")),
+        h("button", { class: "x", title: T("关闭", "Close"), onclick: () => this.close() }, "×")),
+      body);
+    if (tab === "settings") settingsPanel.mount(body);
+    else panel.mount(body);
+  },
+
+  close() {
+    document.removeEventListener("mousedown", popup.outside, true);
+    document.removeEventListener("keydown", popup.escape, true);
+    panel.unmount();
+    settingsPanel.unmount();
+    popup.el?.remove();
+    popup.el = null;
+  },
+
+  outside(ev) {
+    const target = ev.target instanceof Element ? ev.target : null;
+    if (!popup.el || !target || popup.el.contains(target) || findButton()?.contains(target)) return;
+    // our password dialog, ComfyUI's confirm dialogs and toasts sit outside the popup: keep it open
+    if (target.closest(".snack-dlg-back, .p-dialog-mask, .p-dialog, .p-toast, [role=dialog]")) return;
+    popup.close();
+  },
+
+  escape(ev) {
+    if (ev.key === "Escape" && !document.querySelector(".snack-dlg-back")) popup.close();
+  },
+};
+
 app.registerExtension({
-  name: "SnackNodes.UploadPanel",
+  name: "SnackNodes.Popup",
   actionBarButtons: [{
     icon: "pi pi-cloud-upload",
-    label: T("上传", "Uploads"),
+    label: "SnackNodes",
     tooltip: TOOLTIP,
-    onClick: (event) => panel.toggle(event),
+    onClick: (event) => (popup.el ? popup.close() : popup.open(null, null, event)),
   }],
   setup() {
     addStyle();
     api.addEventListener("snacknodes.upload", ({ detail }) => panel.onEvent(detail));
     api.addEventListener("reconnected", () => panel.load());
+    // the node's status line asks to open the drive settings
+    window.addEventListener(OPEN, (ev) => popup.open(ev.detail?.tab, ev.detail?.provider));
     panel.load();
     // the action bar may be re-rendered (layout or size changes): put the badge back
     setInterval(() => panel.updateBadge(), 2000);

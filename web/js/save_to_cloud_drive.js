@@ -16,7 +16,7 @@ function isChinese() {
 const T = (zh, en) => (isChinese() ? zh : en);
 const tr = (pair) => (pair ? (isChinese() ? pair.zh : pair.en) || pair.en || "" : "");
 
-const MIN_WIDTH = 480; // fits "remote_folder  ComfyUI/%date:yyyy-MM-dd%" without truncation
+const NEW_WIDTH = 360; // default width of a new node (about three canvas grid cells)
 
 function toast(severity, summary, detail) {
   const t = app.extensionManager?.toast;
@@ -199,7 +199,7 @@ app.registerExtension({
       onNodeCreated?.apply(this, arguments);
       // The node has a VIDEO input, so the Vue node UI would otherwise play the previews as video.
       this.previewMediaType = "image";
-      if (this.size[0] < MIN_WIDTH) this.setSize([MIN_WIDTH, this.size[1]]);
+      this.setSize([NEW_WIDTH, this.size[1]]);
     };
 
     const onExecuted = nodeType.prototype.onExecuted;

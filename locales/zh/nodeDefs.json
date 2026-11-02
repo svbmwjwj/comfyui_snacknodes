@@ -5,7 +5,7 @@
     "inputs": {
       "provider": {
         "name": "网盘",
-        "tooltip": "上传到哪个网盘。在左侧边栏 SnackNodes 面板里连接网盘（点下面的状态行即可打开）。"
+        "tooltip": "上传到哪个网盘。在顶部 SnackNodes →「网盘设置」里连接网盘（点下面的状态行即可打开）。"
       },
       "remote_folder": {
         "name": "网盘目录",
@@ -13,7 +13,7 @@
       },
       "encrypt": {
         "name": "加密",
-        "tooltip": "上传前加密文件内容和文件名（Cryptomator 保险库格式），用 Cryptomator App 打开。保险库在左侧边栏 SnackNodes 面板里设置一次。"
+        "tooltip": "上传前加密文件内容和文件名（Cryptomator 保险库格式），用 Cryptomator App 打开。保险库在顶部 SnackNodes →「网盘设置」里设置一次。"
       },
       "preview": {
         "name": "预览",

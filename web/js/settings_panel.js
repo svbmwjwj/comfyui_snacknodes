@@ -1,17 +1,17 @@
-// "SnackNodes" sidebar tab: connect drives and set up encryption vaults, for all nodes at once.
+// "网盘设置 / Cloud drives" tab of the SnackNodes popup: connect drives and set up encryption vaults,
+// for all nodes at once. The popup itself lives in upload_panel.js (one place for settings and uploads).
 // Everything is stored on the ComfyUI machine (nodes/routes.py -> cloud_drive/connect.py), never in a
 // workflow; passwords and secret keys are typed into masked fields and never sent back to the page.
-import { app } from "../../../scripts/app.js";
 import {
-  PROVIDERS, SETTINGS_TAB, T, call, changed, confirmDialog, h, t, toast, vaultCall, vaultDialog,
+  PROVIDERS, T, call, changed, confirmDialog, h, t, toast, vaultCall, vaultDialog,
 } from "./snack_common.js";
 
 const CSS = `
 .snack-set{display:flex;flex-direction:column;height:100%;font:13px/1.5 sans-serif;color:var(--fg-color,#ddd)}
-.snack-set-head{padding:12px 14px;border-bottom:1px solid var(--border-color,#444)}
+.snack-set-head{padding:8px 14px 0}
 .snack-set-head h3{margin:0 0 2px;font-size:15px;font-weight:600}
 .snack-set-head div{opacity:.7;font-size:12px}
-.snack-set-list{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+.snack-set-list{padding:10px;display:flex;flex-direction:column;gap:10px}
 .snack-card{border:1px solid var(--border-color,#444);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;
   background:var(--comfy-input-bg,rgba(255,255,255,.03))}
 .snack-card.focus{outline:2px solid #4ea1ff}
@@ -254,19 +254,17 @@ class SettingsPanel {
   constructor() {
     this.cards = Object.values(PROVIDERS).map((p) => new DriveCard(this, p));
     this.root = null;
-    window.addEventListener("snacknodes:focus-drive", (ev) => this.focus(ev.detail?.provider));
   }
 
   mount(el) {
     if (!document.getElementById("snack-set-style")) document.head.append(h("style", { id: "snack-set-style" }, CSS));
     this.root = h("div", { class: "snack-set" },
-      h("div", { class: "snack-set-head" }, h("h3", {}, T("网盘设置", "Cloud drives")),
+      h("div", { class: "snack-set-head" },
         h("div", {}, T("「保存到网盘」节点用这里的连接和保险库。只保存在运行 ComfyUI 的机器上。",
           "Connections and vaults used by Save to Cloud Drive, stored on the ComfyUI machine only."))),
       h("div", { class: "snack-set-list" }, this.cards.map((c) => c.el)));
     el.replaceChildren(this.root);
-    for (const card of this.cards) card.load();
-    if (this.pendingFocus) { this.focus(this.pendingFocus); this.pendingFocus = null; }
+    this.loaded = Promise.all(this.cards.map((card) => card.load()));
   }
 
   unmount() {
@@ -274,30 +272,13 @@ class SettingsPanel {
     for (const card of this.cards) clearTimeout(card.timer);
   }
 
-  focus(provider) {
-    if (!provider) return;
-    if (!this.root) { this.pendingFocus = provider; return; }
+  async focus(provider) {
+    if (!provider || !this.root) return;
     for (const card of this.cards) card.el.classList.toggle("focus", card.provider === provider);
-    this.cards.find((c) => c.provider === provider)?.el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    await this.loaded; // cards change height when their status arrives: scroll after that
+    this.cards.find((c) => c.provider === provider)?.el.scrollIntoView({ block: "start" });
   }
 }
 
-const panel = new SettingsPanel();
-
-app.registerExtension({
-  name: "SnackNodes.Settings",
-  setup() {
-    const manager = app.extensionManager;
-    if (!manager?.registerSidebarTab) return;
-    manager.registerSidebarTab({
-      id: SETTINGS_TAB,
-      icon: "pi pi-cloud",
-      title: "SnackNodes",
-      label: "SnackNodes",
-      tooltip: T("SnackNodes 网盘设置", "SnackNodes cloud drives"),
-      type: "custom",
-      render: (el) => panel.mount(el),
-      destroy: () => panel.unmount(),
-    });
-  },
-});
+// Shown in the SnackNodes popup of the top action bar (upload_panel.js), next to the upload queue.
+export const settingsPanel = new SettingsPanel();

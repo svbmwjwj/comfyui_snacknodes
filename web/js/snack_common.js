@@ -1,5 +1,5 @@
 // Shared by SnackNodes' frontend files: language helpers, server calls, the masked vault password
-// dialog, and opening the SnackNodes sidebar tab. Loaded by ComfyUI like the other files in web/js
+// dialog, and opening the SnackNodes popup. Loaded by ComfyUI like the other files in web/js
 // (it registers no extension itself).
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
@@ -7,7 +7,7 @@ import { api } from "../../../scripts/api.js";
 export const NODE = "SnackSaveToCloudDrive";
 // Dropdown label -> provider id (same as cloud_drive.NODE_PROVIDERS), in dropdown order
 export const PROVIDERS = { "Google Drive": "google_drive", WebDAV: "webdav", "Cloudflare R2": "r2" };
-export const SETTINGS_TAB = "snacknodes-settings";
+export const OPEN = "snacknodes:open"; // window event: open the SnackNodes popup on a tab
 export const CHANGED = "snacknodes:drives-changed"; // window event after a connection or vault changed
 
 export const zh = () => {
@@ -198,13 +198,8 @@ export function vaultDialog({ mode, path, drive, minLength, submit }) {
 
 
 export function openSettings(provider) {
-  // Open the SnackNodes sidebar tab (and point it at a drive). The tab store is reactive.
-  const store = app.extensionManager?.sidebarTab;
-  if (store && store.activeSidebarTabId !== SETTINGS_TAB) {
-    if (store.toggleSidebarTab) store.toggleSidebarTab(SETTINGS_TAB);
-    else store.activeSidebarTabId = SETTINGS_TAB;
-  }
-  window.dispatchEvent(new CustomEvent("snacknodes:focus-drive", { detail: { provider } }));
+  // Open the SnackNodes popup (top action bar) on its drive settings tab, pointed at this drive.
+  window.dispatchEvent(new CustomEvent(OPEN, { detail: { tab: "settings", provider } }));
 }
 
 export function changed(provider) {

@@ -159,7 +159,7 @@ class SaveToCloudDrive:
         return {
             "required": {
                 "provider": (list(PROVIDER_LABELS), {
-                    "tooltip": "Which cloud drive to upload to. Connect drives in the SnackNodes sidebar tab "
+                    "tooltip": "Which cloud drive to upload to. Connect drives in SnackNodes > Cloud drives (top bar) "
                                "(click the status line below).",
                 }),
                 "remote_folder": ("STRING", {
@@ -172,7 +172,8 @@ class SaveToCloudDrive:
                 "encrypt": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open "
-                               "them with the Cryptomator app. Set up the vault once in the SnackNodes sidebar tab.",
+                               "them with the Cryptomator app. Set up the vault once in SnackNodes > Cloud drives "
+                               "(top bar).",
                 }),
                 "preview": ("BOOLEAN", {
                     "default": False,

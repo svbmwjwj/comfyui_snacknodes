@@ -5,7 +5,7 @@
     "inputs": {
       "provider": {
         "name": "provider",
-        "tooltip": "Which cloud drive to upload to. Connect drives in the SnackNodes sidebar tab (click the status line below)."
+        "tooltip": "Which cloud drive to upload to. Connect drives in SnackNodes > Cloud drives (top bar) (click the status line below)."
       },
       "remote_folder": {
         "name": "remote_folder",
@@ -13,7 +13,7 @@
       },
       "encrypt": {
         "name": "encrypt",
-        "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open them with the Cryptomator app. Set up the vault once in the SnackNodes sidebar tab."
+        "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open them with the Cryptomator app. Set up the vault once in SnackNodes > Cloud drives (top bar)."
       },
       "preview": {
         "name": "preview",

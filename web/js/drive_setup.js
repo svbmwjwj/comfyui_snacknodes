@@ -1,7 +1,7 @@
 // One status line on Save to Cloud Drive, right below the drive dropdown:
 //   ✓ 已连接：存储桶 comfy，上限 10 GB · 🔒 保险库 ComfyUI-Vault
-//   ⚠ 未连接 · 点此在侧边栏连接
-// Clicking it opens the SnackNodes sidebar tab (settings_panel.js), where drives and vaults are set up.
+//   ⚠ 未连接 · 点此连接
+// Clicking it opens the SnackNodes popup of the top action bar on its drive settings tab.
 //
 // Frontend notes (checked against comfyui_frontend_package 1.57):
 // - node.widgets is a tracked array: splice() also updates the Nodes 2.0 (Vue) widget order.
@@ -39,7 +39,7 @@ class StatusRow {
     try {
       const status = await call(provider);
       if (!status.connected) {
-        text = T("⚠ 未连接 · 点此在侧边栏连接", "⚠ Not connected · click to connect in the sidebar");
+        text = T("⚠ 未连接 · 点此连接", "⚠ Not connected · click to connect");
       } else {
         const summary = t(status.summary);
         text = "✓ " + T("已连接", "Connected") + (summary ? T("：", ": ") + summary : "");
@@ -49,7 +49,7 @@ class StatusRow {
             : T(" · ⚠ 已开加密但没有保险库，点此设置", " · ⚠ encrypt is on but no vault, click to set up");
         }
       }
-      tip = T("连接网盘、设置保险库：左侧边栏 SnackNodes（点此打开）", "Drives and vaults: SnackNodes in the left sidebar (click to open)");
+      tip = T("连接网盘、设置保险库：顶部操作栏的 SnackNodes 按钮（点此打开）", "Drives and vaults: the SnackNodes button in the top bar (click to open)");
     } catch (e) {
       text = "⚠ " + t(e);
       tip = t(e);
@@ -103,7 +103,7 @@ app.registerExtension({
     }
   },
   setup() {
-    // a drive or vault changed in the sidebar: update every node's status line
+    // a drive or vault changed in the settings: update every node's status line
     window.addEventListener(CHANGED, () => {
       for (const node of app.graph?._nodes || app.graph?.nodes || []) node.snackStatus?.refresh();
     });

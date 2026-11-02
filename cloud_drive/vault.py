@@ -19,7 +19,7 @@ class VaultNotConfigured(CloudDriveError):
     """Encryption is on but no vault was created/unlocked for this drive."""
 
 
-AUTH_HINT = ("Set it up in the SnackNodes sidebar tab, or run: "
+AUTH_HINT = ("Set it up in SnackNodes > Cloud drives (top bar), or run: "
              f"{AUTH_SCRIPT} vault-create (or vault-unlock)")
 
 
