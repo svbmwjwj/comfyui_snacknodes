@@ -32,6 +32,7 @@ import requests
 from .base import (DEFAULT_TIMEOUT, RETRY_STATUS, AuthRequired, CloudDriveError, Progress, Provider,
                    raise_after_retries)
 from .config import CredentialStore
+from .paths import AUTH_SCRIPT
 
 GB = 1000 ** 3  # Cloudflare bills in decimal GB
 PART_SIZE = 16 * 1024 * 1024
@@ -134,7 +135,7 @@ class S3(Provider):
     env_prefix = "SNACK_S3_"
     default_region = "us-east-1"
     default_limit_gb = 0.0
-    auth_hint = ("Run: python custom_nodes/comfyui_snacknodes/auth.py s3 --endpoint URL --bucket BUCKET "
+    auth_hint = (f"Run: {AUTH_SCRIPT} s3 --endpoint URL --bucket BUCKET "
                  "--access-key-id KEY")
     FIELDS = ("endpoint", "region", "bucket", "access_key_id", "secret_access_key", "public_url", "limit_gb")
 
@@ -377,5 +378,5 @@ class R2(S3):
     env_prefix = "SNACK_R2_"
     default_region = "auto"
     default_limit_gb = 10.0
-    auth_hint = ("Run: python custom_nodes/comfyui_snacknodes/auth.py r2 --account-id ID --bucket BUCKET "
+    auth_hint = (f"Run: {AUTH_SCRIPT} r2 --account-id ID --bucket BUCKET "
                  "--access-key-id KEY")

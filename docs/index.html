@@ -39,13 +39,14 @@
 <p class="lang">When you authorize Google Drive, the app requests only the <code>drive.file</code> scope: it can see and change only the files and folders it created itself, and uses this solely to upload the files you choose to save into your own Google Drive. It cannot read anything else in your Drive. The app runs entirely on the machine where you run ComfyUI; the developers operate no servers and receive no data. Details: <a href="privacy.html">Privacy Policy</a>.</p>
 
 <h2>开始使用 / Get started</h2>
-<p>在 ComfyUI Manager 中搜索 <code>snacknodes</code>，或者手动安装：<span class="lang">Search for <code>snacknodes</code> in ComfyUI Manager, or install manually:</span></p>
-<pre>cd ComfyUI/custom_nodes
-git clone https://github.com/svbmwjwj/comfyui_snacknodes
-pip install -r comfyui_snacknodes/requirements.txt
+<p>在 ComfyUI Manager 中搜索 <code>SnackNodes</code>，或者手动安装：<span class="lang">Search for <code>SnackNodes</code> in ComfyUI Manager, or install manually:</span></p>
+<pre>comfy node install SnackNodes
 
-# 授权一次 / authorize once (from the ComfyUI folder)
-python custom_nodes/comfyui_snacknodes/auth.py google_drive</pre>
+# 或 / or
+cd ComfyUI/custom_nodes
+git clone https://github.com/svbmwjwj/comfyui_snacknodes SnackNodes
+pip install -r SnackNodes/requirements.txt</pre>
+<p>然后添加「保存到网盘」节点，选好网盘，在节点上直接连接即可。<span class="lang">Then add the Save to Cloud Drive node, pick a drive and connect it right on the node.</span></p>
 <p>完整说明见 <a href="https://github.com/svbmwjwj/comfyui_snacknodes#readme">README</a>。<span class="lang">Full documentation: README.</span></p>
 
 <footer>

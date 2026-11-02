@@ -8,7 +8,7 @@
 
 Google Drive · Cloudflare R2 · WebDAV ｜ 可选 Cryptomator 端到端加密
 
-[![Comfy Registry](https://img.shields.io/badge/Comfy_Registry-comfyui__snacknodes-blue)](https://registry.comfy.org/publishers/svbmwjwj/nodes/comfyui_snacknodes)
+[![Comfy Registry](https://img.shields.io/badge/Comfy_Registry-SnackNodes-blue)](https://registry.comfy.org/publishers/svbmwjwj/nodes/SnackNodes)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](LICENSE)
 
 [项目主页](https://snacknodes.linksluckytime.com) · [隐私政策](https://snacknodes.linksluckytime.com/privacy.html) · [问题反馈](https://github.com/svbmwjwj/comfyui_snacknodes/issues)
@@ -57,15 +57,23 @@ Google Drive · Cloudflare R2 · WebDAV ｜ 可选 Cryptomator 端到端加密
 
 ## 🚀 快速开始
 
-**① 安装**：在 ComfyUI Manager 里搜索 `comfyui_snacknodes` 安装；或者手动安装：
+**① 安装**：在 ComfyUI Manager 里搜索 `SnackNodes` 安装；或者用 comfy-cli：
 
 ```bash
-cd ComfyUI/custom_nodes && git clone https://github.com/svbmwjwj/comfyui_snacknodes
+comfy node install SnackNodes
+```
+
+或者手动安装（最后的 `SnackNodes` 是文件夹名，和 Registry 安装的一致）：
+
+```bash
+cd ComfyUI/custom_nodes && git clone https://github.com/svbmwjwj/comfyui_snacknodes SnackNodes
 ```
 
 ```bash
-pip install -r comfyui_snacknodes/requirements.txt
+pip install -r SnackNodes/requirements.txt
 ```
+
+> 🔁 **从 2.0.0 升级**：2.1.0 起 Registry 节点 ID 从 `comfyui_snacknodes` 改为 `SnackNodes`，旧 ID 不再更新。请在 Manager 里卸载 `comfyui_snacknodes`，再安装 `SnackNodes`（不要两个同时装）。已连接的网盘和保险库保存在 `~/.config/comfyui_snacknodes/`，换装后**不用重新连接**；工作流也不用改。
 
 **② 添加节点并连接网盘**：添加 **保存到网盘** 节点（搜索「网盘」「上传」「upload」都能找到），在「网盘」里选一个。还没连接过的话，节点上会直接出现要填的项目，填好点「连接」即可，**不用开终端**。
 
@@ -91,7 +99,7 @@ pip install -r comfyui_snacknodes/requirements.txt
 终端方式：
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py google_drive
+python custom_nodes/SnackNodes/auth.py google_drive
 ```
 
 - 文件上传到**你自己的 Google Drive**，占用你自己的空间。内置的 OAuth 客户端只用来标识这个应用，本身访问不了任何人的 Drive。
@@ -140,7 +148,7 @@ R2 是 Cloudflare 的对象存储，**每月免费 10 GB 存储、100 万次写�
 终端方式（效果相同，另外支持 `--public-url`：存储桶开启了公开访问时填 r2.dev 或自定义域名，节点会输出能直接打开的链接）：
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py r2 --url https://<账户ID>.r2.cloudflarestorage.com/comfyui --access-key-id 访问密钥ID
+python custom_nodes/SnackNodes/auth.py r2 --url https://<账户ID>.r2.cloudflarestorage.com/comfyui --access-key-id 访问密钥ID
 ```
 
 **说明**
@@ -160,7 +168,7 @@ python custom_nodes/comfyui_snacknodes/auth.py r2 --url https://<账户ID>.r2.cl
 终端方式：
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py webdav --url https://dav.jianguoyun.com/dav/ --username 你的账号
+python custom_nodes/SnackNodes/auth.py webdav --url https://dav.jianguoyun.com/dav/ --username 你的账号
 ```
 
 按提示输入密码。工具会先连一次服务器，确认地址和密码正确后才保存（节点上连接时也一样）。
@@ -181,11 +189,11 @@ python custom_nodes/comfyui_snacknodes/auth.py webdav --url https://dav.jianguoy
 <summary><b>查看状态、退出登录、环境变量</b></summary>
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py status
+python custom_nodes/SnackNodes/auth.py status
 ```
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py logout r2
+python custom_nodes/SnackNodes/auth.py logout r2
 ```
 
 （在节点上点「断开」效果相同。）
@@ -214,7 +222,7 @@ python custom_nodes/comfyui_snacknodes/auth.py logout r2
 <summary><b>S3 兼容存储</b>：AWS S3、Backblaze B2、MinIO、Wasabi……</summary>
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py s3 --endpoint https://s3.us-east-1.amazonaws.com --region us-east-1 --bucket 存储桶 --access-key-id 密钥ID
+python custom_nodes/SnackNodes/auth.py s3 --endpoint https://s3.us-east-1.amazonaws.com --region us-east-1 --bucket 存储桶 --access-key-id 密钥ID
 ```
 
 按提示输入 Secret Access Key。和 R2 一样支持 `--public-url` 和 `--limit-gb`（S3 默认不限制）。
@@ -236,7 +244,7 @@ python custom_nodes/comfyui_snacknodes/auth.py s3 --endpoint https://s3.us-east-
 > 阿里云盘开放平台自 2025 年 7 月 1 日起**暂停个人开发者申请**。其他用户请用 OpenList 挂载阿里云盘，再按 WebDAV 方式连接。
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID --client-secret 你的Secret
+python custom_nodes/SnackNodes/auth.py aliyundrive --client-id 你的ID --client-secret 你的Secret
 ```
 
 打开输出的二维码链接，用阿里云盘 App 扫码确认。扫码失败时可以加 `--refresh-token 你的token` 直接导入。
@@ -311,8 +319,8 @@ python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID 
 <summary>终端方式（效果相同）</summary>
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py vault-create r2 --path ComfyUI-Vault
-python custom_nodes/comfyui_snacknodes/auth.py vault-unlock webdav --path 我的保险库
+python custom_nodes/SnackNodes/auth.py vault-create r2 --path ComfyUI-Vault
+python custom_nodes/SnackNodes/auth.py vault-unlock webdav --path 我的保险库
 ```
 
 `vault-create` 可加 `--own-password` / `--generate-password` 跳过选择。

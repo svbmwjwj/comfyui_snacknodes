@@ -13,13 +13,14 @@ from typing import Optional
 from . import cryptomator as cm
 from .base import CloudDriveError, Progress, Provider, UploadResult, split_folder
 from .config import CredentialStore
+from .paths import AUTH_SCRIPT
 
 class VaultNotConfigured(CloudDriveError):
     """Encryption is on but no vault was created/unlocked for this drive."""
 
 
 AUTH_HINT = ("Set it up below encrypt on the node, or run: "
-             "python custom_nodes/comfyui_snacknodes/auth.py vault-create (or vault-unlock)")
+             f"{AUTH_SCRIPT} vault-create (or vault-unlock)")
 
 
 def _store_key(provider_name: str) -> str:

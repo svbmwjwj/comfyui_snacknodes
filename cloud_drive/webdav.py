@@ -19,10 +19,11 @@ import requests
 from .base import (DEFAULT_TIMEOUT, RETRY_STATUS, AuthRequired, CloudDriveError, Progress, Provider,
                    raise_after_retries, request)
 from .config import CredentialStore
+from .paths import AUTH_SCRIPT
 
 NAME = "webdav"
 DISPLAY_NAME = "WebDAV"
-AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER"
+AUTH_HINT = f"Run: {AUTH_SCRIPT} webdav --url URL --username USER"
 PROPFIND_BODY = ('<?xml version="1.0" encoding="utf-8"?>'
                  '<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>')
 

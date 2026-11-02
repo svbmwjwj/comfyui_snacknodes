@@ -1,6 +1,6 @@
 # 开发记录与测试计划
 
-最后更新：2026-11-02 · **2.1.0 开发中：R2、节点内连接网盘（原生控件）** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
+最后更新：2026-11-02 · **2.1.0 开发中：R2、节点内连接网盘和设置保险库；Registry ID 改为 `SnackNodes`** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
 
 ## 已完成
 
@@ -36,7 +36,7 @@
 8. **用户本地实测反馈（2026-11-02，ComfyUI 0.43.2，前端 1.57.4，macOS，`comfy launch`，路径 `/Users/yuono/Developer/comfyui`）**：
    - 之前的 404：旧 ComfyUI 进程占着 8188 端口，新进程没起来。已加启动日志 `SnackNodes: drive setup routes ready` 和 404 时的中文提示（提交 `a0165b5`）。关掉旧进程后，R2 显示「✓ 已连接」，后端正常
    - **用户不满意的地方 1：连接面板的样式**。现在是 HTML 面板（`web/js/drive_setup.js`，DOM 小部件），而且节点被撑得很高、按钮被截断。用户要的是：选了某个网盘后，**直接在「网盘」下拉框下面展开几行原生控件**，样子和「网盘目录」那一行一样
-   - **用户不满意的地方 2：节点上方的标签仍显示 `comfyui_snacknodes`**。查了前端源码（`getNodeSource` / `shortenNodeName`）：这个标签取自插件**文件夹名**（`custom_nodes/<文件夹>`），只会去掉大小写完全匹配的 `ComfyUI-`/`ComfyUI_`/`Comfy-`/`Comfy_` 前缀；`pyproject.toml` 的 `DisplayName` 只影响 Registry 和 Manager 的列表。从 Registry 安装时文件夹名就是节点 ID `comfyui_snacknodes`（不可改），所以**我们改不了这个标签**。用户自己可以在设置里关掉节点来源标签。如果一定要改，只能换一个新的 Registry ID（之前讨论过的代价：老用户收不到更新）。**待用户决定**：2026-11-02 的对话里用户把「保持现状 / 换新 ID」两个选项都列了出来，没有选定；在用户明确选择之前按「保持现状」处理（不用改任何东西）。用户随后问「要不要改仓库名」：**不用**。1.57.4 的 `getNodeSource` 只看 `python_module` 里 `custom_nodes.` 后面那一段（即文件夹名），从 Registry 安装时文件夹名是节点 ID，和 GitHub 仓库名无关；改仓库名只会影响以后用 `git clone` 新装的人，已装的文件夹不会变
+   - **用户不满意的地方 2：节点上方的标签仍显示 `comfyui_snacknodes`**。查了前端源码（`getNodeSource` / `shortenNodeName`）：这个标签取自插件**文件夹名**（`custom_nodes/<文件夹>`），只会去掉大小写完全匹配的 `ComfyUI-`/`ComfyUI_`/`Comfy-`/`Comfy_` 前缀；`pyproject.toml` 的 `DisplayName` 只影响 Registry 和 Manager 的列表。从 Registry 安装时文件夹名就是节点 ID `comfyui_snacknodes`（不可改），所以**我们改不了这个标签**。用户自己可以在设置里关掉节点来源标签。如果一定要改，只能换一个新的 Registry ID（之前讨论过的代价：老用户收不到更新）。**已决定（2026-11-02）：换新 ID `SnackNodes`**（见第 11 条）。用户随后问「要不要改仓库名」：**不用**。1.57.4 的 `getNodeSource` 只看 `python_module` 里 `custom_nodes.` 后面那一段（即文件夹名），从 Registry 安装时文件夹名是节点 ID，和 GitHub 仓库名无关；改仓库名只会影响以后用 `git clone` 新装的人，已装的文件夹不会变
 
 9. **连接面板改成原生控件（2026-11-02）**：`web/js/drive_setup.js` 重写，不再用 HTML 面板（DOM 小部件）。选好网盘后，「网盘」下拉框下面直接出现几行原生控件，样子和「网盘目录」那一行一样：
    - R2：文本控件「S3 API 地址」「访问密钥 ID」「机密访问密钥」「容量上限（GB）（可选）」+ 按钮「连接」；WebDAV：「WebDAV 地址」「用户名」「密码」+「连接」。字段、标签、默认值仍由后端 `FORMS` 提供，说明放在控件的悬停提示里
@@ -57,7 +57,20 @@
    - 前端代码重构：通用的 `Rows`（挂在某个控件下面的一组行），`DriveRows` 挂在「网盘」下，`VaultRows` 挂在「加密」下。已确认 Vue 界面改值也会调用控件的 callback，所以两种界面都能感知「加密」开关
    - 验证：`pytest` 103 个通过（新增保险库接口测试：未连接、密码太短、新建、重复新建、忘记、密码错误、位置不存在、重新解锁得到同一密钥、返回内容不含密码）；aiohttp 路由实测；用 Playwright 在真实浏览器里跑了模块（桩 app/api + 模拟节点）：开关加密、密码太短、生成密码确认最后一组、创建后显示就绪、解锁密码错误、关掉加密行消失，弹窗截图正常。**还没在真实 ComfyUI 里看过**
 
+11. **节点 ID 改为 `SnackNodes`；节点说明缩短（2026-11-02）**：
+   - 用户确认换新 ID，并选定 `SnackNodes`。验证（comfy.org 在本环境被网络策略拦截，改读 GitHub 上的源码）：
+     - Registry 后端 `Comfy-Org/registry-backend` 的 `mapper/node.go` `IsValidNodeID`：允许 ASCII 大小写字母、数字、`_ - .`，不能以符号开头或结尾，1–100 字符；测试用例里有 `ValidNodeID` 这样的大小写混合 ID。创建时 ID 原样保存，另存一份小写的 `normalized_id`，所以大写会保留，重名按不区分大小写判断
+     - 安装文件夹：ComfyUI-Manager `_cnr_install` 用 `custom_nodes/<node_id>`，comfy-cli `registry_install` 也是 `custom_nodes/<node_id>`，都不改大小写 → 标签显示 `SnackNodes`（`shortenNodeName` 不会去掉它）。用 comfy-cli 时如果用户输入小写 `snacknodes`，文件夹就是小写
+     - **没能确认 `SnackNodes` 在 Registry 上没被占用**（API 打不开）。GitHub 代码搜索里没有别的仓库用这个名字。如果被占用，合并后发布那一步会失败，到时换名字即可。用户可以自己打开 https://registry.comfy.org/nodes/SnackNodes 看一眼
+   - 改动：`pyproject.toml` `name = "SnackNodes"`（版本仍 2.1.0）；终端命令提示不再写死文件夹名，改为读实际安装目录（`cloud_drive/paths.py` 的 `AUTH_SCRIPT`），新老安装都正确；README / 主页的安装步骤改为搜索 `SnackNodes`、`comfy node install SnackNodes`、手动 `git clone ... SnackNodes`；README 加了「从 2.0.0 升级」：卸载 `comfyui_snacknodes` 再装 `SnackNodes`，不要同时装两个
+   - **凭据目录保持 `~/.config/comfyui_snacknodes/` 不变**，换装后不用重新连接；节点类名 `SnackSaveToCloudDrive` 不变，旧工作流照常打开
+   - GitHub 仓库名没改（用 `git clone` 不指定目录时文件夹仍叫 `comfyui_snacknodes`）。要不要改仓库名由用户决定：GitHub 会自动跳转旧地址，但 `pyproject.toml` 的 Repository/Icon 链接、主页和隐私政策里的链接最好一起改
+   - **节点说明（DESCRIPTION）缩短为一句话**：ComfyUI 鼠标悬停在节点标题上就会显示说明（不是只在节点信息里），原来的长用法太乱。细节都在各项的悬停提示里；「同名文件不覆盖」移到「网盘目录」的提示里
+   - 合并后要做（在 registry.comfy.org 发布者后台手动）：确认新节点 `SnackNodes` 已发布；把旧节点 `comfyui_snacknodes` 的描述改成「已改名为 SnackNodes」或标记弃用
+
 ### 下一步：请用户在本地测（新对话从这里开始）
+
+本地是用 git 装的话，文件夹名不会变（标签仍是 `comfyui_snacknodes`），这是正常的；标签要等合并发布后从 Registry 装 `SnackNodes` 才会变。
 
 步骤：节点目录 `git pull` → 停掉旧 ComfyUI（`lsof -ti tcp:8188 | xargs kill`）→ `comfy launch` → 浏览器 `Cmd+Shift+R`。经典界面和 Nodes 2.0 各看一遍：
 1. 打开「加密」：下面出现保险库位置和两个按钮；点「新建保险库」→ 弹窗 → 选自动生成 → 存好密码 → 输入最后一组 → 创建，节点显示「🔒 保险库：ComfyUI-Vault（已就绪）」
@@ -166,7 +179,7 @@
 
 - **项目主页与 Google 品牌验证（2026-11-01 完成）**：Google 修改品牌信息时要求品牌验证，`github.com` 无法证明归属，于是改用项目方自己的域名。主页 `https://snacknodes.linksluckytime.com/`，隐私政策 `https://snacknodes.linksluckytime.com/privacy.html`，由 GitHub Pages 托管 `docs/` 目录（`main` / `/docs`，`docs/CNAME`）。域名 `linksluckytime.com` 已在 Search Console 验证；**Google OAuth 品牌已验证并发布**，用户授权时会看到应用名称「ComfyUI SnackNodes」
   - DNS 里的 TXT 记录（`google-site-verification=...`）和 CNAME（`snacknodes` → `svbmwjwj.github.io`）要一直保留，删掉会导致验证失效或主页打不开
-  - 名称约定：Registry 节点 ID 和 GitHub 仓库名固定为 `comfyui_snacknodes`；Google 应用名称 `ComfyUI SnackNodes`，主页标题与之一致（品牌验证会核对）；品牌名 SnackNodes
+  - 名称约定：Registry 节点 ID 从 2.1.0 起为 `SnackNodes`（旧 ID `comfyui_snacknodes` 停在 2.0.0），GitHub 仓库名仍为 `comfyui_snacknodes`；Google 应用名称 `ComfyUI SnackNodes`，主页标题与之一致（品牌验证会核对）；品牌名 SnackNodes
   - 开发分支 `claude/stoic-fermat-wano83` 已不再被任何外部链接引用，可以删除
 - 要从 Registry 真正下架或弃用旧版本，需要在 registry.comfy.org 的发布者后台手动操作
 

@@ -13,13 +13,14 @@ from typing import Optional
 import requests
 
 from .base import AuthRequired, CloudDriveError
+from .paths import AUTH_SCRIPT
 
 AUTH_COMMANDS = {
-    "google_drive": "python custom_nodes/comfyui_snacknodes/auth.py google_drive",
-    "webdav": "python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER",
-    "aliyundrive": "python custom_nodes/comfyui_snacknodes/auth.py aliyundrive",
-    "r2": "python custom_nodes/comfyui_snacknodes/auth.py r2 --url S3_API_URL",
-    "s3": "python custom_nodes/comfyui_snacknodes/auth.py s3 --endpoint URL --bucket BUCKET",
+    "google_drive": "{auth} google_drive",
+    "webdav": "{auth} webdav --url URL --username USER",
+    "aliyundrive": "{auth} aliyundrive",
+    "r2": "{auth} r2 --url S3_API_URL",
+    "s3": "{auth} s3 --endpoint URL --bucket BUCKET",
 }
 KEY_PROVIDERS = ("r2", "s3")
 
@@ -90,11 +91,10 @@ MESSAGES: dict[str, tuple[str, str, str, str]] = {
         "Check the network. If you need a proxy, set HTTPS_PROXY and restart ComfyUI."),
     "vault_not_configured": (
         "已开启加密，但这个网盘还没有设置保险库。",
-        "在节点「加密」下面出现的几行里新建或打开保险库；或在终端执行：python custom_nodes/comfyui_snacknodes/auth.py "
-        "vault-create {name}",
+        "在节点「加密」下面出现的几行里新建或打开保险库；或在终端执行：{auth} vault-create {name}",
         "Encryption is on, but no vault is set up for this drive.",
         "Create or open a vault in the rows below encrypt on the node, or run: "
-        "python custom_nodes/comfyui_snacknodes/auth.py vault-create {name}"),
+        "{auth} vault-create {name}"),
     "local_file": (
         "本地文件不存在或无法读取。",
         "检查「额外上传文件」里的路径（相对于 ComfyUI 的 output 目录）。",
@@ -177,7 +177,8 @@ def explain(exc: BaseException, provider_name: str, provider_label: str, file_na
             local_copy: str = "") -> Explanation:
     code = classify(exc, provider_name)
     zh_title, zh_hint, en_title, en_hint = MESSAGES[code]
-    fill = {"provider": provider_label, "cmd": AUTH_COMMANDS.get(provider_name, "auth.py"), "name": provider_name}
+    cmd = AUTH_COMMANDS.get(provider_name, "{auth}").format(auth=AUTH_SCRIPT)
+    fill = {"provider": provider_label, "cmd": cmd, "name": provider_name, "auth": AUTH_SCRIPT}
     zh = [zh_title.format(**fill), zh_hint.format(**fill)]
     en = [en_title.format(**fill), en_hint.format(**fill)]
     if file_name:

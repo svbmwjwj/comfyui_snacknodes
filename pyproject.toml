@@ -4,7 +4,7 @@ requires = ["setuptools>=65.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "comfyui_snacknodes"
+name = "SnackNodes"
 description = "Save ComfyUI outputs to your own Google Drive, Cloudflare R2 (10 GB free) or WebDAV server (Nutstore, Nextcloud, NAS...), connected right on the node, optionally end-to-end encrypted as a Cryptomator vault."
 version = "2.1.0"
 authors = [

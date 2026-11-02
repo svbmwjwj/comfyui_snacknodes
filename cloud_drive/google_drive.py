@@ -18,6 +18,7 @@ import requests
 
 from .base import AuthRequired, CloudDriveError, Progress, Provider, request
 from .config import CredentialStore
+from .paths import AUTH_SCRIPT
 
 NAME = "google_drive"
 DISPLAY_NAME = "Google Drive"
@@ -55,7 +56,7 @@ def resolve_client(client_id: Optional[str] = None,
     return None, None, "none"
 
 
-AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py google_drive"
+AUTH_HINT = f"Run: {AUTH_SCRIPT} google_drive"
 
 
 def _escape(value: str) -> str:
