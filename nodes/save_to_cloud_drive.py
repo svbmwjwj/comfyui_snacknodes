@@ -134,28 +134,8 @@ class SaveToCloudDrive:
                        "True when every file was uploaded. With stop_on_error off, a failed upload gives False "
                        "instead of stopping the workflow, so you can branch on it.")
     # English texts live here; other languages in locales/<lang>/nodeDefs.json.
-    DESCRIPTION = """Upload images, a video or existing files to your own cloud drive, optionally end-to-end encrypted.
-
-One-time setup: pick the drive, and the node shows what to fill in (Google Drive: a
-Connect button). Credentials are stored on the ComfyUI machine, never in the workflow.
-Encryption: turn on encrypt, then create or open a vault in the rows below it
-(once per drive; the password is never stored).
-
-Usage
-- Connect images and/or video; pick the drive.
-- remote_folder: folder on the drive, created if missing. Date tokens:
-  ComfyUI/%date:yyyy-MM-dd%  ->  ComfyUI/2026-11-01
-  ComfyUI/%year%/%month%     ->  ComfyUI/2026/11
-- encrypt: file contents and names are encrypted before upload (Cryptomator vault);
-  open them with the Cryptomator app.
-- preview: show the images on the node after the run (off by default).
-- keep_local_copy: also keep the files in ComfyUI's output folder.
-- Advanced: filename_prefix (local file names); stop_on_error off = keep going and
-  output success = False instead of stopping the workflow.
-- Outputs: remote_paths (one line per file) and success (True/False) for automation.
-- file_paths (input): connect a text node listing files that already exist in the output
-  folder, one per line, e.g. video/ComfyUI_00001_.mp4
-Existing files are never overwritten (name_1, name_2 ...)."""
+    DESCRIPTION = ("Upload images and videos to your own cloud drive (Google Drive, WebDAV, Cloudflare R2), "
+                   "optionally end-to-end encrypted. Hover over each option for details.")
     SEARCH_ALIASES = ["upload", "google drive", "aliyun", "alipan", "cloud", "export", "backup",
                       "encrypt", "cryptomator", "webdav", "nutstore", "jianguoyun", "nextcloud",
                       "s3", "r2", "cloudflare", "object storage", "minio", "backblaze",
@@ -172,7 +152,8 @@ Existing files are never overwritten (name_1, name_2 ...)."""
                     "default": "ComfyUI/%date:yyyy-MM-dd%",
                     "tooltip": "Folder on the drive (inside the vault when encrypting); created if missing. "
                                "Date tokens: %date:yyyy-MM-dd%, %year%, %month%, %day%, %hour%, %minute%, "
-                               "%second% (server local time). Example: ComfyUI/%date:yyyy-MM%",
+                               "%second% (server local time). Example: ComfyUI/%date:yyyy-MM%. "
+                               "Existing files are never overwritten (name_1, name_2 ...).",
                 }),
                 "encrypt": ("BOOLEAN", {
                     "default": False,

@@ -247,7 +247,7 @@ python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID 
 
 ## 🧩 节点说明
 
-节点名 **保存到网盘**（英文界面为 Save to Cloud Drive），界面语言跟随 ComfyUI 设置。悬停在每一项上有说明；右键 → 节点信息里有完整用法。
+节点名 **保存到网盘**（英文界面为 Save to Cloud Drive），界面语言跟随 ComfyUI 设置。悬停在每一项上有说明。
 
 | 项目 | 默认值 | 说明 |
 |---|---|---|

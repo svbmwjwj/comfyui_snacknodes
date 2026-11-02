@@ -1,7 +1,7 @@
 {
   "SnackSaveToCloudDrive": {
     "display_name": "Save to Cloud Drive",
-    "description": "Upload images, a video or existing files to your own cloud drive, optionally end-to-end encrypted.\n\nOne-time setup: pick the drive, and the node shows what to fill in (Google Drive: a\nConnect button). Credentials are stored on the ComfyUI machine, never in the workflow.\nEncryption: turn on encrypt, then create or open a vault in the rows below it\n(once per drive; the password is never stored).\n\nUsage\n- Connect images and/or video; pick the drive.\n- remote_folder: folder on the drive, created if missing. Date tokens:\n  ComfyUI/%date:yyyy-MM-dd%  ->  ComfyUI/2026-11-01\n  ComfyUI/%year%/%month%     ->  ComfyUI/2026/11\n- encrypt: file contents and names are encrypted before upload (Cryptomator vault);\n  open them with the Cryptomator app.\n- preview: show the images on the node after the run (off by default).\n- keep_local_copy: also keep the files in ComfyUI's output folder.\n- Advanced: filename_prefix (local file names); stop_on_error off = keep going and\n  output success = False instead of stopping the workflow.\n- Outputs: remote_paths (one line per file) and success (True/False) for automation.\n- file_paths (input): connect a text node listing files that already exist in the output\n  folder, one per line, e.g. video/ComfyUI_00001_.mp4\nExisting files are never overwritten (name_1, name_2 ...).",
+    "description": "Upload images and videos to your own cloud drive (Google Drive, WebDAV, Cloudflare R2), optionally end-to-end encrypted. Hover over each option for details.",
     "inputs": {
       "provider": {
         "name": "provider",
@@ -9,7 +9,7 @@
       },
       "remote_folder": {
         "name": "remote_folder",
-        "tooltip": "Folder on the drive (inside the vault when encrypting); created if missing. Date tokens: %date:yyyy-MM-dd%, %year%, %month%, %day%, %hour%, %minute%, %second% (server local time). Example: ComfyUI/%date:yyyy-MM%"
+        "tooltip": "Folder on the drive (inside the vault when encrypting); created if missing. Date tokens: %date:yyyy-MM-dd%, %year%, %month%, %day%, %hour%, %minute%, %second% (server local time). Example: ComfyUI/%date:yyyy-MM% Existing files are never overwritten (name_1, name_2 ...)."
       },
       "encrypt": {
         "name": "encrypt",
