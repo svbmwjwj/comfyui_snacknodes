@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfyui_snacknodes"
-description = "Save ComfyUI outputs to your own Google Drive, WebDAV server (Nutstore, Nextcloud, NAS...) or Aliyun Drive, optionally end-to-end encrypted as a Cryptomator vault."
-version = "2.0.0"
+description = "Save ComfyUI outputs to your own Google Drive, Cloudflare R2 (10 GB free), S3, WebDAV server (Nutstore, Nextcloud, NAS...) or Aliyun Drive, optionally end-to-end encrypted as a Cryptomator vault."
+version = "2.1.0"
 authors = [
     {name = "svbmwjwj", email = "255624542+svbmwjwj@users.noreply.github.com"}
 ]

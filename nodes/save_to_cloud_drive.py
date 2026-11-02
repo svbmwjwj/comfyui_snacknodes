@@ -121,7 +121,7 @@ class _ProgressReporter:
 
 
 class SaveToCloudDrive:
-    """Save outputs locally, then upload them to Google Drive, a WebDAV server or Aliyun Drive,
+    """Save outputs locally, then upload them to Google Drive, a WebDAV server, Cloudflare R2 / S3 or Aliyun Drive,
     optionally end-to-end encrypted into a Cryptomator vault."""
 
     CATEGORY = "SnackNodes"
@@ -139,6 +139,7 @@ class SaveToCloudDrive:
 One-time setup (in a terminal on the ComfyUI machine):
   python custom_nodes/comfyui_snacknodes/auth.py google_drive
   python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER
+  python custom_nodes/comfyui_snacknodes/auth.py r2 --account-id ID --bucket BUCKET   (10 GB free)
   python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   (only for encrypt)
 Credentials are stored on that machine, never in the workflow.
 
@@ -159,7 +160,8 @@ Usage
 Existing files are never overwritten (name_1, name_2 ...)."""
     SEARCH_ALIASES = ["upload", "google drive", "aliyun", "alipan", "cloud", "export", "backup",
                       "encrypt", "cryptomator", "webdav", "nutstore", "jianguoyun", "nextcloud",
-                      "上传", "网盘", "云盘", "备份", "加密", "坚果云"]
+                      "s3", "r2", "cloudflare", "object storage", "minio", "backblaze",
+                      "上传", "网盘", "云盘", "备份", "加密", "坚果云", "对象存储"]
 
     @classmethod
     def INPUT_TYPES(cls):

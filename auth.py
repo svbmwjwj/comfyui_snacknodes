@@ -3,6 +3,8 @@
 
   python auth.py google_drive  [--client-id ID --client-secret SECRET]
   python auth.py webdav        --url https://dav.example.com/ --username USER
+  python auth.py r2            --account-id ID --bucket BUCKET --access-key-id KEY  [--limit-gb 10]
+  python auth.py s3            --endpoint https://s3.us-east-1.amazonaws.com --region us-east-1 --bucket BUCKET
   python auth.py aliyundrive   --client-id ID --client-secret SECRET
   python auth.py vault-create  google_drive  --path ComfyUI-Vault  [--generate-password]
   python auth.py vault-unlock  aliyundrive   --path ComfyUI-Vault
@@ -84,6 +86,35 @@ def auth_webdav(args, store):
     password = os.environ.get("SNACK_WEBDAV_PASSWORD") or getpass.getpass("Password (app password if offered): ")
     WebDAV(store).configure(url, username, password)
     print(f"WebDAV connected: {url}")
+
+
+def auth_s3(args, store):
+    """r2 and s3: keys are checked by listing the bucket before they are stored."""
+    from cloud_drive import PROVIDERS
+    cls = PROVIDERS[args.cmd]
+    env = cls.env_prefix
+    values = {"public_url": args.public_url, "limit_gb": args.limit_gb}
+    if args.cmd == "r2":
+        values["account_id"] = _ask("Cloudflare account ID (R2 page, right column): ",
+                                    args.account_id or os.environ.get(env + "ACCOUNT_ID"))
+    else:
+        values["endpoint"] = _ask("Endpoint URL (e.g. https://s3.us-east-1.amazonaws.com): ",
+                                  args.endpoint or os.environ.get(env + "ENDPOINT"))
+        values["region"] = args.region or os.environ.get(env + "REGION") or "us-east-1"
+    values["bucket"] = _ask("Bucket name: ", args.bucket or os.environ.get(env + "BUCKET"))
+    values["access_key_id"] = _ask("Access Key ID: ", args.access_key_id or os.environ.get(env + "ACCESS_KEY_ID"))
+    values["secret_access_key"] = (os.environ.get(env + "SECRET_ACCESS_KEY")
+                                   or getpass.getpass("Secret Access Key: ").strip())
+    provider = cls(store)
+    provider.configure(values)
+    print(f"{cls.display_name} connected: bucket '{values['bucket']}'.")
+    limit = provider.limit_bytes()
+    if limit > 0:
+        used = provider.used_bytes()
+        print(f"Bucket usage: {used / 1e9:.2f} GB of the {limit / 1e9:g} GB limit. Uploads that would go over "
+              f"are refused (change with --limit-gb, 0 = no limit).")
+    elif args.cmd == "r2":
+        print("No storage limit: storage above R2's 10 GB free tier will be billed by Cloudflare.")
 
 
 PASSWORD_WARNING = """
@@ -170,6 +201,22 @@ def main():
     p = sub.add_parser("webdav", help="Connect a WebDAV server (Nutstore/坚果云, Nextcloud, NAS, OpenList...)")
     p.add_argument("--url")
     p.add_argument("--username")
+    for name in ("r2", "s3"):
+        r2 = name == "r2"
+        p = sub.add_parser(name, help="Connect Cloudflare R2 (10 GB free)" if r2 else
+                           "Connect S3-compatible storage (AWS S3, Backblaze B2, MinIO, Wasabi...)")
+        if r2:
+            p.add_argument("--account-id", help="Cloudflare account ID")
+        else:
+            p.add_argument("--endpoint", help="S3 endpoint URL, e.g. https://s3.us-east-1.amazonaws.com")
+            p.add_argument("--region", help="Region (default us-east-1)")
+        p.add_argument("--bucket")
+        p.add_argument("--access-key-id")
+        p.add_argument("--public-url", help="Optional public base URL (r2.dev or custom domain); "
+                                            "the node then outputs links")
+        p.add_argument("--limit-gb", type=float,
+                       help="Refuse uploads that would take the bucket over this size "
+                            + ("(default 10 = R2 free tier; 0 = no limit)" if r2 else "(default 0 = no limit)"))
     for cmd in ("vault-create", "vault-unlock"):
         p = sub.add_parser(cmd, help=f"{cmd.split('-')[1].title()} a Cryptomator vault")
         p.add_argument("provider", choices=list(PROVIDERS))
@@ -191,6 +238,8 @@ def main():
             auth_aliyun(args, store)
         elif args.cmd == "webdav":
             auth_webdav(args, store)
+        elif args.cmd in ("r2", "s3"):
+            auth_s3(args, store)
         elif args.cmd in ("vault-create", "vault-unlock"):
             vault(args, store, create=args.cmd == "vault-create")
         elif args.cmd == "status":
