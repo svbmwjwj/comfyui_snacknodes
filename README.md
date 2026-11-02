@@ -277,8 +277,10 @@ python custom_nodes/snacknodes/auth.py aliyundrive --client-id 你的ID --client
 
 **输出**
 
-- **上传结果**：每个文件一行。开启「等待上传完成」时：Google Drive 和设置了 `--public-url` 的 R2/S3 返回可打开的链接，其他返回 `网盘:路径`；后台上传时：每个文件将要存放的位置
-- **成功**：开启「等待上传完成」时，全部上传成功为 true，可以用来做分支判断；后台上传时，加入上传队列即为 true
+- **成功**（布尔）：开启「等待上传完成」时，全部上传成功为 true，可以用来做分支判断；后台上传时，加入上传队列即为 true
+- **文件数**（整数）：开启「等待上传完成」时是上传成功的文件数；后台上传时是加入队列的文件数
+
+每个文件存到了哪里（Google Drive 和设置了 `--public-url` 的 R2/S3 有可打开的链接）显示在节点上和顶部 SnackNodes 的上传队列里。
 
 **运行时**，节点上会显示：
 
@@ -299,7 +301,7 @@ python custom_nodes/snacknodes/auth.py aliyundrive --client-id 你的ID --client
 - R2/S3 的大文件（64 MB 以上）每次同时传 4 个分片，速度更快
 - 关闭「保留本地副本」时，文件会先放在 ComfyUI 的 `user/snacknodes_pending/`，上传成功后删除（ComfyUI 的 temp 目录重启会清空，不能放那里）
 
-需要在同一个工作流里用「上传结果 / 成功」输出时，打开 **等待上传完成**，行为和以前一样。
+需要在同一个工作流里用「成功 / 文件数」输出时，打开 **等待上传完成**，行为和以前一样。
 
 **租用 GPU 服务器（如 AutoDL）关机前**，先等上传完：
 

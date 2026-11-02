@@ -78,7 +78,7 @@ def test_plain_upload(node_module):
     mod, out, drive, _ = node_module
     images = FakeTensor(np.random.rand(2, 8, 8, 3).astype(np.float32))
     res = _upload(mod, "Google Drive", "none", "ComfyUI/x", "pic", images=images)
-    lines = res["result"][0].splitlines()
+    lines = res["ui"]["text"][0].splitlines()
     assert lines == ["local:ComfyUI/x/pic_00001_.png", "local:ComfyUI/x/pic_00002_.png"]
     assert (drive / "ComfyUI" / "x" / "pic_00001_.png").read_bytes() == (out / "pic_00001_.png").read_bytes()
     assert "images" not in res["ui"]  # preview is off by default
@@ -97,7 +97,7 @@ def test_encrypted_upload(node_module, tmp_path):
     images = FakeTensor(np.random.rand(1, 8, 8, 3).astype(np.float32))
     res = _upload(mod, "Google Drive", "Cryptomator vault", "ComfyUI", "pic",
                                                  images=images)
-    assert res["result"][0] == "local:Vault/ComfyUI/pic_00001_.png [encrypted]"
+    assert res["ui"]["text"][0] == "local:Vault/ComfyUI/pic_00001_.png [encrypted]"
     assert not (drive / "ComfyUI").exists()
     # find the single encrypted png and decrypt it
     enc = [os.path.join(r, f) for r, _, fs in os.walk(drive / "Vault" / "d") for f in fs
@@ -116,7 +116,7 @@ def test_file_paths_outside_comfy_dirs_are_refused(node_module, tmp_path):
         _upload(mod, "Google Drive", "none", "a", "p", file_paths="../secret.txt")
     (out / "ok.txt").write_text("fine")
     res = _upload(mod, "Google Drive", "none", "a", "p", file_paths="ok.txt")
-    assert res["result"][0] == "local:a/ok.txt"
+    assert res["ui"]["text"][0] == "local:a/ok.txt"
 
 
 def test_nothing_to_upload(node_module):
@@ -142,7 +142,7 @@ def test_remote_folder_date_tokens(node_module):
     res = _upload(mod, "Google Drive", "none", "ComfyUI/%date:yyyy-MM%", "pic",
                                                  images=images)
     month = datetime.now().strftime("%Y-%m")
-    assert res["result"][0] == f"local:ComfyUI/{month}/pic_00001_.png"
+    assert res["ui"]["text"][0] == f"local:ComfyUI/{month}/pic_00001_.png"
     assert (drive / "ComfyUI" / month / "pic_00001_.png").exists()
 
 
@@ -156,7 +156,7 @@ def test_preview_switch(node_module):
                                                  preview=False, filename_prefix="off", images=images,
                                                  wait_for_upload=True)
     assert len(on["ui"]["images"]) == 1 and "images" not in off["ui"]
-    assert on["result"][1] is True and on["ui"]["upload_ok"] == [True]
+    assert on["result"] == (True, 1) and on["ui"]["upload_ok"] == [True]
     assert off["ui"]["text"] == ["local:p/off_00001_.png"]
 
 
@@ -170,7 +170,7 @@ def test_layout_and_defaults(node_module):
     assert spec["required"]["remote_folder"][1]["default"] == "ComfyUI/%date:yyyy-MM-dd%"
     advanced = [k for part in ("required", "optional") for k, v in spec[part].items() if v[1].get("advanced")]
     assert advanced == ["filename_prefix", "stop_on_error", "file_paths"]
-    assert mod.SaveToCloudDrive.RETURN_TYPES == ("STRING", "BOOLEAN")
+    assert mod.SaveToCloudDrive.RETURN_TYPES == ("BOOLEAN", "INT")
     assert spec["required"]["encrypt"][1]["default"] is False and spec["required"]["stop_on_error"][1]["default"]
 
 
@@ -203,7 +203,7 @@ def test_stop_on_error(node_module, monkeypatch):
     assert "网盘目录不可写" in msg and "cannot be created" in msg  # locale unknown in tests: both
     assert "HTTP 409 Conflict" in msg and "p_00001_.png" in msg
     res = _upload(mod, "Google Drive", "none", "a", "q", images=images, stop_on_error=False)
-    assert res["result"] == ("", False)
+    assert res["result"] == (False, 0)
     err = res["ui"]["upload_error"][0]
     assert res["ui"]["upload_ok"] == [False] and err["code"] == "conflict"
     assert err["zh"].startswith("网盘目录不可写") and "409" in err["detail"]
@@ -234,7 +234,7 @@ def test_progress_reports_bytes_over_all_files(node_module, monkeypatch, tmp_pat
         instance=Server())))
     res = mod.SaveToCloudDrive().save_and_upload(provider="Google Drive", remote_folder="r",
                                                  file_paths="a.bin\nb.bin", unique_id="7", wait_for_upload=True)
-    assert res["result"][1] is True
+    assert res["result"] == (True, 2)
     assert calls[-1] == (400, 400) and all(t == 400 for _, t in calls)
     assert [v for v, _ in calls] == sorted(v for v, _ in calls)  # never goes backwards
     assert texts[-1] == ("2/2 · b.bin · 0.0 MB/0.0 MB", "7") and texts[0][0].startswith("1/2 · a.bin")
@@ -258,7 +258,8 @@ def test_background_upload_returns_at_once(node_module, tmp_path):
     res = mod.SaveToCloudDrive().save_and_upload(provider="Google Drive", remote_folder="bg", images=images,
                                                  filename_prefix="pic", keep_local_copy=False, unique_id="5")
     job = res["ui"]["upload_job"][0]
-    assert res["result"] == ("google_drive:bg/pic_00001_.png\ngoogle_drive:bg/pic_00002_.png", True)
+    assert res["result"] == (True, 2)
+    assert res["ui"]["text"] == ["google_drive:bg/pic_00001_.png\ngoogle_drive:bg/pic_00002_.png"]
     assert job["state"] == "queued" and job["node_id"] == "5" and not list(drive.iterdir())
     pending = tmp_path / "snacknodes_pending"
     assert len(list(pending.iterdir())) == 1  # own copies: temp/ is emptied when ComfyUI restarts
@@ -277,5 +278,5 @@ def test_background_checks_setup_before_queueing(node_module, tmp_path):
         mod.SaveToCloudDrive().save_and_upload(provider="Google Drive", remote_folder="x", images=images)
     res = mod.SaveToCloudDrive().save_and_upload(provider="Google Drive", remote_folder="x", images=images,
                                                  stop_on_error=False)
-    assert res["result"] == ("", False) and res["ui"]["upload_error"][0]["code"] == "not_authorized"
+    assert res["result"] == (False, 0) and res["ui"]["upload_error"][0]["code"] == "not_authorized"
     assert queue.jobs() == []
