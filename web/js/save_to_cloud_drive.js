@@ -16,7 +16,7 @@ function isChinese() {
 const T = (zh, en) => (isChinese() ? zh : en);
 const tr = (pair) => (pair ? (isChinese() ? pair.zh : pair.en) || pair.en || "" : "");
 
-const NEW_WIDTH = 360; // default width of a new node (about three canvas grid cells)
+const NEW_WIDTH = 300; // default width of a new node: three cells of the canvas grid (100 units each)
 
 function toast(severity, summary, detail) {
   const t = app.extensionManager?.toast;
