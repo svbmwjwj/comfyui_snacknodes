@@ -13,13 +13,13 @@ import numpy as np
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
-from ..cloud_drive import PROVIDERS, CloudDriveError  # noqa: F401 - re-exported for callers and tests
+from ..cloud_drive import NODE_PROVIDERS, PROVIDERS, CloudDriveError  # noqa: F401 - re-exported for tests
 from ..cloud_drive.errors import explain, ui_locale
 from ..cloud_drive.vault import CryptomatorVault
 
 logger = logging.getLogger(__name__)
 
-PROVIDER_LABELS = {cls.display_name: name for name, cls in PROVIDERS.items()}
+PROVIDER_LABELS = {PROVIDERS[name].display_name: name for name in NODE_PROVIDERS}
 
 
 _DATE_TOKEN = re.compile(r"%date:([^%]+)%")
@@ -121,7 +121,7 @@ class _ProgressReporter:
 
 
 class SaveToCloudDrive:
-    """Save outputs locally, then upload them to Google Drive, a WebDAV server, Cloudflare R2 / S3 or Aliyun Drive,
+    """Save outputs locally, then upload them to Google Drive, a WebDAV server or Cloudflare R2,
     optionally end-to-end encrypted into a Cryptomator vault."""
 
     CATEGORY = "SnackNodes"
@@ -136,12 +136,10 @@ class SaveToCloudDrive:
     # English texts live here; other languages in locales/<lang>/nodeDefs.json.
     DESCRIPTION = """Upload images, a video or existing files to your own cloud drive, optionally end-to-end encrypted.
 
-One-time setup (in a terminal on the ComfyUI machine):
-  python custom_nodes/comfyui_snacknodes/auth.py google_drive
-  python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER
-  python custom_nodes/comfyui_snacknodes/auth.py r2 --account-id ID --bucket BUCKET   (10 GB free)
-  python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   (only for encrypt)
-Credentials are stored on that machine, never in the workflow.
+One-time setup: pick the drive, and the node shows what to fill in (Google Drive: a
+Connect button). Credentials are stored on the ComfyUI machine, never in the workflow.
+Encryption: create the vault once in a terminal on that machine:
+  python custom_nodes/comfyui_snacknodes/auth.py vault-create r2
 
 Usage
 - Connect images and/or video; pick the drive.
@@ -168,7 +166,7 @@ Existing files are never overwritten (name_1, name_2 ...)."""
         return {
             "required": {
                 "provider": (list(PROVIDER_LABELS), {
-                    "tooltip": "Which cloud drive to upload to. Authorize it once with auth.py.",
+                    "tooltip": "Which cloud drive to upload to. Connect it once in the panel that appears on the node.",
                 }),
                 "remote_folder": ("STRING", {
                     "default": "ComfyUI/%date:yyyy-MM-dd%",

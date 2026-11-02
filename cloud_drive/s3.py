@@ -20,11 +20,12 @@ import hashlib
 import hmac
 import io
 import os
+import re
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 import requests
 
@@ -38,6 +39,24 @@ MULTIPART_THRESHOLD = 64 * 1024 * 1024
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 # S3 error codes that mean the keys themselves are wrong (HTTP 403, not a permission problem)
 BAD_KEY_CODES = ("SignatureDoesNotMatch", "InvalidAccessKeyId", "InvalidToken")
+
+
+def parse_r2_url(text: str) -> dict[str, str]:
+    """Accept what the Cloudflare dashboard shows and return endpoint / bucket:
+    the bucket's "S3 API" URL (https://<account>.r2.cloudflarestorage.com/<bucket>, also the
+    .eu / .fedramp jurisdictions), the endpoint without a bucket, or a bare 32-character account ID."""
+    text = (text or "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]{32}", text):
+        return {"endpoint": f"https://{text.lower()}.r2.cloudflarestorage.com"}
+    m = re.fullmatch(r"(?:https?://)?([0-9a-fA-F]{32}(?:\.[a-z]+)?\.r2\.cloudflarestorage\.com)(?::443)?/?([^/?#]*)/?",
+                     text)
+    if not m:
+        raise CloudDriveError("This is not an R2 address. Copy the bucket's S3 API URL from the Cloudflare "
+                              "dashboard, e.g. https://<account ID>.r2.cloudflarestorage.com/<bucket>")
+    out = {"endpoint": "https://" + m.group(1).lower()}
+    if m.group(2):
+        out["bucket"] = unquote(m.group(2))
+    return out
 
 
 class StorageLimitReached(CloudDriveError):
@@ -237,8 +256,8 @@ class S3(Provider):
         try:
             self._list("", max_keys=1, conf=merged)
         except AuthRequired as e:
-            raise CloudDriveError(f"Wrong Access Key ID or Secret Access Key ({e.body and _xml_code(e.body)}).",
-                                  status=e.status, body=e.body) from e
+            raise AuthRequired(f"Wrong Access Key ID or Secret Access Key ({e.body and _xml_code(e.body)}).",
+                               status=e.status, body=e.body) from e
         except CloudDriveError as e:
             code = _xml_code(e.body)
             if code == "NoSuchBucket" or e.status == 404:

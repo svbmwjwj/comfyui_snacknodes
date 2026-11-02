@@ -6,7 +6,7 @@
 
 **把 ComfyUI 生成的图片和视频，直接存进你自己的网盘**
 
-Google Drive · Cloudflare R2 · S3 · WebDAV · 阿里云盘 ｜ 可选 Cryptomator 端到端加密
+Google Drive · Cloudflare R2 · WebDAV ｜ 可选 Cryptomator 端到端加密
 
 [![Comfy Registry](https://img.shields.io/badge/Comfy_Registry-comfyui__snacknodes-blue)](https://registry.comfy.org/publishers/svbmwjwj/nodes/comfyui_snacknodes)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](LICENSE)
@@ -45,13 +45,13 @@ Google Drive · Cloudflare R2 · S3 · WebDAV · 阿里云盘 ｜ 可选 Cryptom
 
 ## 📦 支持的存储
 
-| 存储 | 适合谁 | 免费空间 | 授权命令 |
+| 存储 | 适合谁 | 免费空间 | 连接时需要填 |
 |---|---|---|---|
-| **Google Drive** | 有 Google 账号的人 | 15 GB | `auth.py google_drive` |
-| **Cloudflare R2** ⭐ | 想要一个稳定、免费、无流量费的仓库 | **10 GB**，下载不收费 | `auth.py r2` |
-| **S3 兼容存储** | AWS S3、Backblaze B2、MinIO、Wasabi、各家对象存储 | 看服务商 | `auth.py s3` |
-| **WebDAV** | 坚果云、Nextcloud、群晖等 NAS、OpenList/AList | 看服务商 | `auth.py webdav` |
-| **阿里云盘** | 已有开放平台应用的开发者 | — | `auth.py aliyundrive` |
+| **Google Drive** | 有 Google 账号的人 | 15 GB | 不用填，点「连接」后登录 |
+| **Cloudflare R2** ⭐ | 想要一个稳定、免费、无流量费的仓库 | **10 GB**，下载不收费 | S3 API 地址、密钥 ID、机密 |
+| **WebDAV** | 坚果云、Nextcloud、群晖等 NAS、OpenList/AList | 看服务商 | 地址、用户名、密码 |
+
+> 通用 S3（AWS、B2、MinIO……）和阿里云盘的代码已经写好，但**还没用真实账号测试**，所以暂时不在节点里显示，见[实验性支持](#-实验性支持待实测)。
 
 > 💡 **不知道选哪个？** 国内网络选 **坚果云（WebDAV）**；能访问海外选 **Cloudflare R2**，10 GB 免费、下载不收流量费，本工具还会帮你守住 10 GB 上限，不会产生费用。
 
@@ -67,26 +67,32 @@ cd ComfyUI/custom_nodes && git clone https://github.com/svbmwjwj/comfyui_snackno
 pip install -r comfyui_snacknodes/requirements.txt
 ```
 
-**② 授权一次**：在**运行 ComfyUI 的那台机器**的终端里，从 ComfyUI 根目录执行（以 Google Drive 为例，其他存储见[下文](#-授权)）：
+**② 添加节点并连接网盘**：添加 **保存到网盘** 节点（搜索「网盘」「上传」「upload」都能找到），在「网盘」里选一个。还没连接过的话，节点上会直接出现要填的项目，填好点「连接」即可，**不用开终端**。
 
-```bash
-python custom_nodes/comfyui_snacknodes/auth.py google_drive
-```
+**③ 运行**：连上图像或视频，运行工作流，文件就会传到网盘。
 
-**③ 用起来**：添加节点 **保存到网盘**（搜索「网盘」「上传」「upload」都能找到），连上图像或视频，选好网盘，运行。
 
-## 🔑 授权
+## 🔑 连接网盘
 
-所有命令都在 ComfyUI 根目录下执行。展开对应的存储查看步骤：
+在节点上选好网盘后，节点会自动显示这个网盘需要的信息：
+
+- **已连接**：显示 `✓ 已连接` 和概况（比如存储桶名和容量上限），可以「修改」或「断开」
+- **还没连接**：显示要填的项目，填完点「连接」。工具会先试连一次，确认无误才保存
+
+连接信息保存在**运行 ComfyUI 的那台机器**上（`~/.config/comfyui_snacknodes/cloud_drive.json`，权限 600），**不会写进工作流**；保存后密码和密钥也不会再显示到网页上。
+
+习惯用终端也可以：每个网盘下面都给了对应的 `auth.py` 命令（在 ComfyUI 根目录执行），效果相同。展开查看各网盘的说明：
 
 <details>
-<summary><b>Google Drive</b>：打开网址、输入验证码即可</summary>
+<summary><b>Google Drive</b>：点「连接」，打开网址、输入验证码即可</summary>
+
+在节点上点 **连接 Google Drive**，节点会显示一个网址和验证码。用手机或电脑打开网址、输入验证码，用你自己的 Google 账号登录并同意授权，节点会自动变成「已连接」。
+
+终端方式：
 
 ```bash
 python custom_nodes/comfyui_snacknodes/auth.py google_drive
 ```
-
-按提示在手机或电脑上打开网址、输入验证码，用你自己的 Google 账号登录并同意授权。
 
 - 文件上传到**你自己的 Google Drive**，占用你自己的空间。内置的 OAuth 客户端只用来标识这个应用，本身访问不了任何人的 Drive。
 - 只申请 `drive.file` 权限：本工具**只能看到它自己创建的文件和文件夹**，读不到你 Drive 里的其他内容。详见[隐私政策](PRIVACY.md)。
@@ -116,29 +122,93 @@ R2 是 Cloudflare 的对象存储，**每月免费 10 GB 存储、100 万次写�
 1. 在 R2 概览页点 **管理 API 令牌** → **创建 API 令牌**（选「账户 API 令牌」或「用户 API 令牌」都可以）。
 2. 权限选 **对象读和写（Object Read & Write）**，范围选 **仅应用于特定存储桶** → 刚才的桶。
 3. 创建后页面会显示 **访问密钥 ID（Access Key ID）** 和 **机密访问密钥（Secret Access Key）**。机密只显示一次，先复制下来。
-4. 同一页面上 S3 终结点形如 `https://<账户ID>.r2.cloudflarestorage.com`，中间那串就是**账户 ID**（R2 概览页右侧也能看到）。
+4. 回到存储桶，打开 **设置**，复制 **S3 API** 地址，形如 `https://<账户ID>.r2.cloudflarestorage.com/comfyui`。它已经包含了账户 ID 和桶名。
 
-**3. 连接**
+**3. 在节点上连接**
+
+网盘选 **Cloudflare R2**，把三样东西粘贴进去：
+
+| 节点上的项目 | 填什么 |
+|---|---|
+| S3 API 地址 | 第 4 步复制的地址 |
+| 访问密钥 ID | 第 3 步的 Access Key ID |
+| 机密访问密钥 | 第 3 步的 Secret Access Key |
+| 容量上限（可选） | 默认 10 GB（免费额度）。设为 `0` 关闭检查，超出免费额度的部分会按量计费 |
+
+点「连接」后，工具会先列一次存储桶，确认密钥正确才保存，并显示当前用量。
+
+终端方式（效果相同，另外支持 `--public-url`：存储桶开启了公开访问时填 r2.dev 或自定义域名，节点会输出能直接打开的链接）：
 
 ```bash
-python custom_nodes/comfyui_snacknodes/auth.py r2 --account-id 账户ID --bucket comfyui --access-key-id 访问密钥ID
+python custom_nodes/comfyui_snacknodes/auth.py r2 --url https://<账户ID>.r2.cloudflarestorage.com/comfyui --access-key-id 访问密钥ID
 ```
-
-按提示粘贴机密访问密钥。工具会先列一次存储桶，确认密钥正确后才保存，并显示当前用量，例如 `Bucket usage: 0.42 GB of the 10 GB limit`。
-
-| 可选参数 | 作用 |
-|---|---|
-| `--limit-gb 10` | 存储桶容量上限，默认 10（免费额度）。设为 `0` 关闭检查（超出免费额度的部分会按量计费） |
-| `--public-url https://pub-xxx.r2.dev` | 存储桶开启了公开访问（r2.dev 子域名或自定义域名）时填写，节点会输出可以直接打开的链接 |
 
 **说明**
 
-- 上限按**这个存储桶**的实际大小计算；免费额度是整个账户共用的，如果你还有别的桶，请相应调小 `--limit-gb`。
+- 上限按**这个存储桶**的实际大小计算；免费额度是整个账户共用的，如果你还有别的桶，请相应调小容量上限。
 - 每次运行节点会列一次存储桶来统计用量（每 1000 个文件算 1 次写操作），远低于每月 100 万次的免费额度。
 - 单个文件超过 64 MB 自动分片上传，失败时会清理未完成的分片，不会留下占空间的垃圾。
 - 想在网页上管理文件？直接在 Cloudflare 控制台的存储桶页面浏览、下载、删除即可。
 
 </details>
+
+<details>
+<summary><b>WebDAV</b>：坚果云、Nextcloud、NAS、OpenList……</summary>
+
+在节点上填 **WebDAV 地址、用户名、密码**，点「连接」。各服务的地址和密码见下表。
+
+终端方式：
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py webdav --url https://dav.jianguoyun.com/dav/ --username 你的账号
+```
+
+按提示输入密码。工具会先连一次服务器，确认地址和密码正确后才保存（节点上连接时也一样）。
+
+| 服务 | 地址 | 密码 |
+|---|---|---|
+| 坚果云 | `https://dav.jianguoyun.com/dav/` | 账户信息 → 安全选项 → 第三方应用管理 里生成的**应用密码**，不是登录密码 |
+| Nextcloud / ownCloud | `https://你的域名/remote.php/dav/files/用户名/` | 建议在 设置 → 安全 里生成应用密码 |
+| 群晖 / 威联通等 NAS | 在 NAS 上开启 WebDAV 服务后的地址 | NAS 账号密码 |
+| OpenList / AList | `https://你的域名/dav/` | OpenList 用户密码。可借它挂载阿里云盘、夸克、115 等再上传 |
+
+- 尽量使用 `https://`。用 `http://` 连接非本机地址时密码会明文传输，工具会给出警告。
+- 坚果云免费版有 WebDAV 请求次数限制（每 30 分钟约 600 次），大批量上传可能被限流，工具会自动重试。
+
+</details>
+
+<details>
+<summary><b>查看状态、退出登录、环境变量</b></summary>
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py status
+```
+
+```bash
+python custom_nodes/comfyui_snacknodes/auth.py logout r2
+```
+
+（在节点上点「断开」效果相同。）
+
+凭据保存在 `~/.config/comfyui_snacknodes/cloud_drive.json`（权限 600），可用 `SNACKNODES_CONFIG_DIR` 修改位置。
+
+也可以不用凭据文件，改用环境变量（适合 Docker、云平台的密钥管理）：
+
+| 存储 | 环境变量 |
+|---|---|
+| Google Drive | `SNACK_GDRIVE_CLIENT_ID` `SNACK_GDRIVE_CLIENT_SECRET` `SNACK_GDRIVE_REFRESH_TOKEN` |
+| Cloudflare R2 | `SNACK_R2_ACCOUNT_ID` `SNACK_R2_BUCKET` `SNACK_R2_ACCESS_KEY_ID` `SNACK_R2_SECRET_ACCESS_KEY`，可选 `SNACK_R2_PUBLIC_URL` `SNACK_R2_LIMIT_GB` |
+| S3 | `SNACK_S3_ENDPOINT` `SNACK_S3_REGION` `SNACK_S3_BUCKET` `SNACK_S3_ACCESS_KEY_ID` `SNACK_S3_SECRET_ACCESS_KEY`，可选 `SNACK_S3_PUBLIC_URL` `SNACK_S3_LIMIT_GB` |
+| WebDAV | `SNACK_WEBDAV_URL` `SNACK_WEBDAV_USERNAME` `SNACK_WEBDAV_PASSWORD` |
+| 阿里云盘 | `SNACK_ALIYUNDRIVE_*` |
+
+网络代理遵循标准的 `HTTPS_PROXY` 环境变量。
+
+</details>
+
+## 🧪 实验性支持（待实测）
+
+下面两种存储的代码和自动化测试都已完成，但**还没用真实账号测试过**，所以暂时不在节点的「网盘」下拉框里显示，只能用终端命令配置和测试。实测通过后会放进节点。欢迎有账号的朋友试用并[反馈](https://github.com/svbmwjwj/comfyui_snacknodes/issues)。
 
 <details>
 <summary><b>S3 兼容存储</b>：AWS S3、Backblaze B2、MinIO、Wasabi……</summary>
@@ -161,27 +231,6 @@ python custom_nodes/comfyui_snacknodes/auth.py s3 --endpoint https://s3.us-east-
 </details>
 
 <details>
-<summary><b>WebDAV</b>：坚果云、Nextcloud、NAS、OpenList……</summary>
-
-```bash
-python custom_nodes/comfyui_snacknodes/auth.py webdav --url https://dav.jianguoyun.com/dav/ --username 你的账号
-```
-
-按提示输入密码。工具会先连一次服务器，确认地址和密码正确后才保存。
-
-| 服务 | 地址 | 密码 |
-|---|---|---|
-| 坚果云 | `https://dav.jianguoyun.com/dav/` | 账户信息 → 安全选项 → 第三方应用管理 里生成的**应用密码**，不是登录密码 |
-| Nextcloud / ownCloud | `https://你的域名/remote.php/dav/files/用户名/` | 建议在 设置 → 安全 里生成应用密码 |
-| 群晖 / 威联通等 NAS | 在 NAS 上开启 WebDAV 服务后的地址 | NAS 账号密码 |
-| OpenList / AList | `https://你的域名/dav/` | OpenList 用户密码。可借它挂载阿里云盘、夸克、115 等再上传 |
-
-- 尽量使用 `https://`。用 `http://` 连接非本机地址时密码会明文传输，工具会给出警告。
-- 坚果云免费版有 WebDAV 请求次数限制（每 30 分钟约 600 次），大批量上传可能被限流，工具会自动重试。
-
-</details>
-
-<details>
 <summary><b>阿里云盘</b>：仅限已有开放平台应用的开发者</summary>
 
 > 阿里云盘开放平台自 2025 年 7 月 1 日起**暂停个人开发者申请**。其他用户请用 OpenList 挂载阿里云盘，再按 WebDAV 方式连接。
@@ -196,33 +245,6 @@ python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID 
 
 </details>
 
-<details>
-<summary><b>查看状态、退出登录、环境变量</b></summary>
-
-```bash
-python custom_nodes/comfyui_snacknodes/auth.py status
-```
-
-```bash
-python custom_nodes/comfyui_snacknodes/auth.py logout r2
-```
-
-凭据保存在 `~/.config/comfyui_snacknodes/cloud_drive.json`（权限 600），可用 `SNACKNODES_CONFIG_DIR` 修改位置。
-
-也可以不用凭据文件，改用环境变量（适合 Docker、云平台的密钥管理）：
-
-| 存储 | 环境变量 |
-|---|---|
-| Google Drive | `SNACK_GDRIVE_CLIENT_ID` `SNACK_GDRIVE_CLIENT_SECRET` `SNACK_GDRIVE_REFRESH_TOKEN` |
-| Cloudflare R2 | `SNACK_R2_ACCOUNT_ID` `SNACK_R2_BUCKET` `SNACK_R2_ACCESS_KEY_ID` `SNACK_R2_SECRET_ACCESS_KEY`，可选 `SNACK_R2_PUBLIC_URL` `SNACK_R2_LIMIT_GB` |
-| S3 | `SNACK_S3_ENDPOINT` `SNACK_S3_REGION` `SNACK_S3_BUCKET` `SNACK_S3_ACCESS_KEY_ID` `SNACK_S3_SECRET_ACCESS_KEY`，可选 `SNACK_S3_PUBLIC_URL` `SNACK_S3_LIMIT_GB` |
-| WebDAV | `SNACK_WEBDAV_URL` `SNACK_WEBDAV_USERNAME` `SNACK_WEBDAV_PASSWORD` |
-| 阿里云盘 | `SNACK_ALIYUNDRIVE_*` |
-
-网络代理遵循标准的 `HTTPS_PROXY` 环境变量。
-
-</details>
-
 ## 🧩 节点说明
 
 节点名 **保存到网盘**（英文界面为 Save to Cloud Drive），界面语言跟随 ComfyUI 设置。悬停在每一项上有说明；右键 → 节点信息里有完整用法。
@@ -230,7 +252,7 @@ python custom_nodes/comfyui_snacknodes/auth.py logout r2
 | 项目 | 默认值 | 说明 |
 |---|---|---|
 | 图像 / 视频 | — | 要上传的图片和/或视频 |
-| 网盘 | Google Drive | 上传到哪个存储 |
+| 网盘 | Google Drive | 上传到哪个存储。没连接过的网盘，选中后节点上会出现连接面板 |
 | 网盘目录 | `ComfyUI/%date:yyyy-MM-dd%` | 按日期自动分文件夹，见[日期变量](#-网盘目录与日期变量) |
 | 加密 | 关 | 用 Cryptomator 保险库格式端到端加密，见[加密](#-端到端加密) |
 | 预览 | 开 | 运行后在节点上显示图片 |
@@ -275,7 +297,7 @@ python custom_nodes/comfyui_snacknodes/auth.py logout r2
 
 这就是 Cryptomator 的保险库格式（vault format 8），可以用 **Cryptomator 官方客户端**直接打开，不依赖本工具。兼容性已用 Cryptomator 官方 Java 库 `cryptofs` 双向验证，CI 每次都会重跑。
 
-**第一步：创建保险库**（每个网盘一次）
+**第一步：创建保险库**（每个网盘一次，目前需要在终端里执行）
 
 ```bash
 python custom_nodes/comfyui_snacknodes/auth.py vault-create r2 --path ComfyUI-Vault

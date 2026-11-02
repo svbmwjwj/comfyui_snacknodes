@@ -1,11 +1,11 @@
 {
   "SnackSaveToCloudDrive": {
     "display_name": "保存到网盘",
-    "description": "把图片、视频或已有文件上传到你自己的网盘，可选端到端加密。\n\n一次性设置（在运行 ComfyUI 的机器的终端里执行）：\n  python custom_nodes/comfyui_snacknodes/auth.py google_drive\n  python custom_nodes/comfyui_snacknodes/auth.py webdav --url 地址 --username 用户名\n  python custom_nodes/comfyui_snacknodes/auth.py r2 --account-id 账户ID --bucket 存储桶   （免费 10 GB）\n  python custom_nodes/comfyui_snacknodes/auth.py vault-create webdav   （仅加密时需要）\n凭据只保存在这台机器上，不会写进工作流。\n\n用法\n- 连上 图像 和/或 视频，选择网盘。\n- 网盘目录：不存在会自动创建，支持日期变量：\n  ComfyUI/%date:yyyy-MM-dd%  →  ComfyUI/2026-11-01\n  ComfyUI/%year%/%month%     →  ComfyUI/2026/11\n- 加密：文件内容和文件名在上传前就加密（Cryptomator 保险库格式），用 Cryptomator App 打开。\n- 预览：运行后在节点上显示图片，不需要可以关掉。\n- 保留本地副本：文件同时保留在 ComfyUI 的 output 目录。\n- 高级：文件名前缀（本地文件名）；失败时停止 关掉后，上传失败不会中断工作流，而是输出 成功 = false。\n- 额外上传文件（输入接口）：连一个文本节点，列出 output 目录里已有的文件，一行一个，例如 video/ComfyUI_00001_.mp4\n- 输出：上传结果（每个文件一行）和 成功（true/false），方便做自动化。\n上传时节点上会显示进度条和当前文件；网盘上的同名文件不会被覆盖，会自动改名为 名字_1、名字_2……",
+    "description": "把图片、视频或已有文件上传到你自己的网盘，可选端到端加密。\n\n一次性设置：选好网盘后，节点上会出现需要填写的项目（Google Drive 是一个「连接」按钮）。\n凭据只保存在运行 ComfyUI 的机器上，不会写进工作流。\n加密：在那台机器的终端里创建一次保险库：\n  python custom_nodes/comfyui_snacknodes/auth.py vault-create r2\n\n用法\n- 连上 图像 和/或 视频，选择网盘。\n- 网盘目录：不存在会自动创建，支持日期变量：\n  ComfyUI/%date:yyyy-MM-dd%  →  ComfyUI/2026-11-01\n  ComfyUI/%year%/%month%     →  ComfyUI/2026/11\n- 加密：文件内容和文件名在上传前就加密（Cryptomator 保险库格式），用 Cryptomator App 打开。\n- 预览：运行后在节点上显示图片，不需要可以关掉。\n- 保留本地副本：文件同时保留在 ComfyUI 的 output 目录。\n- 高级：文件名前缀（本地文件名）；失败时停止 关掉后，上传失败不会中断工作流，而是输出 成功 = false。\n- 额外上传文件（输入接口）：连一个文本节点，列出 output 目录里已有的文件，一行一个，例如 video/ComfyUI_00001_.mp4\n- 输出：上传结果（每个文件一行）和 成功（true/false），方便做自动化。\n上传时节点上会显示进度条和当前文件；网盘上的同名文件不会被覆盖，会自动改名为 名字_1、名字_2……",
     "inputs": {
       "provider": {
         "name": "网盘",
-        "tooltip": "上传到哪个网盘。第一次使用前先用 auth.py 授权。"
+        "tooltip": "上传到哪个网盘。第一次使用时，在节点上出现的面板里连接一次即可。"
       },
       "remote_folder": {
         "name": "网盘目录",

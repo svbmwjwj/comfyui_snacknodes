@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ComfyUI SnackNodes · Save to Cloud Drive / 保存到网盘</title>
-<meta name="description" content="ComfyUI SnackNodes (comfyui-snacknodes): a ComfyUI custom node that saves your generated images and videos to your own Google Drive, Cloudflare R2 / S3 or WebDAV storage, optionally end-to-end encrypted.">
+<meta name="description" content="ComfyUI SnackNodes (comfyui-snacknodes): a ComfyUI custom node that saves your generated images and videos to your own Google Drive, Cloudflare R2 or WebDAV storage, optionally end-to-end encrypted.">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body><main>
@@ -13,7 +13,7 @@
   <div class="tag">ComfyUI custom node · comfyui-snacknodes</div>
   <h1>ComfyUI SnackNodes<br><span>Save to Cloud Drive · 保存到网盘</span></h1>
   <p class="lead">把 ComfyUI 生成的图片和视频直接存进<strong>你自己的网盘</strong>，可选端到端加密。适合在 AutoDL 等云端 GPU 上运行 ComfyUI 的个人用户。</p>
-  <p class="lead lang">Save the images and videos you generate in ComfyUI straight to <strong>your own</strong> Google Drive, Cloudflare R2 / S3 or WebDAV storage, optionally end-to-end encrypted.</p>
+  <p class="lead lang">Save the images and videos you generate in ComfyUI straight to <strong>your own</strong> Google Drive, Cloudflare R2 or WebDAV storage, optionally end-to-end encrypted.</p>
   <div class="btns">
     <a href="https://github.com/svbmwjwj/comfyui_snacknodes">GitHub</a>
     <a class="alt" href="privacy.html">隐私政策 / Privacy Policy</a>
@@ -22,7 +22,7 @@
 
 <h2>功能 / Features</h2>
 <div class="grid">
-  <div class="card"><b>Google Drive · Cloudflare R2 · S3 · WebDAV · 阿里云盘</b><p>R2 免费 10 GB、下载不收费；WebDAV 覆盖坚果云、Nextcloud、NAS、OpenList。<br>R2: 10 GB free, no egress fees. WebDAV covers Nutstore, Nextcloud, NAS, OpenList.</p></div>
+  <div class="card"><b>Google Drive · Cloudflare R2 · WebDAV</b><p>R2 免费 10 GB、下载不收费；WebDAV 覆盖坚果云、Nextcloud、NAS、OpenList。<br>R2: 10 GB free, no egress fees. WebDAV covers Nutstore, Nextcloud, NAS, OpenList.</p></div>
   <div class="card"><b>端到端加密 / End-to-end encryption</b><p>Cryptomator 保险库格式，官方 App 直接打开。<br>Cryptomator vault format; open with the official app.</p></div>
   <div class="card"><b>按日期归档 / Date folders</b><p>默认 <code>ComfyUI/%date:yyyy-MM-dd%</code></p></div>
   <div class="card"><b>进度条 · 不覆盖 / Progress · no overwrite</b><p>实时进度；同名文件自动改名。<br>Live progress; existing files are never overwritten.</p></div>

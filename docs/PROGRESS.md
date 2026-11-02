@@ -1,6 +1,6 @@
 # 开发记录与测试计划
 
-最后更新：2026-11-01 · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
+最后更新：2026-11-02 · **2.1.0 开发中：R2、节点内连接网盘** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
 
 ## 已完成
 
@@ -22,6 +22,16 @@
    - 可选 `--public-url`（r2.dev 或自定义域名），节点输出可直接打开的链接
    - 验证：签名与 AWS 文档测试向量及 botocore 输出逐字节一致；用 moto S3 服务端跑通上传、改名、12 MB 分片、上限、保险库读写。**尚未在真实 R2 账户上实测**
    - README 改为：居中标题 + 徽章、功能两栏、存储对比表、三步快速开始；各存储的授权步骤和加密细节折叠到 `<details>`
+   - 用户已在本地用真实 R2 账户测试通过（2026-11-02）
+5. **在节点上连接网盘（2026-11-02）**：用户反馈终端配置太麻烦。现在选好网盘后，节点上直接出现连接面板（`web/js/drive_setup.js`，DOM 小部件，`serialize: false` 不进工作流）：
+   - R2 只要粘贴三项：存储桶「设置 → S3 API」地址（含账户 ID 和桶名，`parse_r2_url` 解析，支持 .eu/.fedramp 管辖区）、访问密钥 ID、机密；可选容量上限
+   - WebDAV：地址、用户名、密码；Google Drive：一个「连接」按钮，节点上显示网址和验证码，后台线程等待授权，前端每 3 秒刷新
+   - 后端 `cloud_drive/connect.py`（逻辑，可测试）+ `nodes/routes.py`（ComfyUI 的 aiohttp 路由 `/snacknodes/drive/...`）。凭据写入同一个凭据文件；状态接口只返回非机密信息（桶名、地址、用户名）
+   - 已连接时显示「✓ 已连接」+ 概况，可「修改」「断开」（断开同时删除该网盘的保险库密钥）
+   - 安全取舍：能打开 ComfyUI 网页的人就能改连接信息（但读不到密钥）；这和能直接运行任意工作流的权限相当
+   - 保险库（加密）仍需在终端用 `auth.py vault-create` 创建
+6. **只在节点里显示实测过的网盘**：下拉框只有 Google Drive、WebDAV、Cloudflare R2（`NODE_PROVIDERS`）。通用 S3 和阿里云盘代码保留，`auth.py` 仍可用，README 移到「实验性支持（待实测）」。注意：2.0.0 的工作流里如果选了 Aliyun Drive，打开后需要重新选择网盘
+7. **显示名**：`DisplayName` 改为 `SnackNodes`。Registry 节点 ID `comfyui_snacknodes` 发布后不可修改（官方文档：name "Immutable after creation"；最佳实践是名称里不带 ComfyUI，但只是建议），所以 ID 不变
 
 ## 已做过的需求决策
 
@@ -128,7 +138,7 @@
 
 ## 后续可能要做的
 
-- **下次发版时一起改**：`pyproject.toml` 的 `DisplayName`（Registry 页面显示的名字）从 `comfyui_snacknodes` 改为 `SnackNodes` 或 `ComfyUI SnackNodes`；节点 ID `name = "comfyui_snacknodes"` 不变。单独改 `pyproject.toml` 会在合并时触发发布，所以和版本号（如 2.0.1）一起改
+- ~~**下次发版时一起改**~~（2.1.0 已改为 `SnackNodes`）：`pyproject.toml` 的 `DisplayName`（Registry 页面显示的名字）从 `comfyui_snacknodes` 改为 `SnackNodes` 或 `ComfyUI SnackNodes`；节点 ID `name = "comfyui_snacknodes"` 不变。单独改 `pyproject.toml` 会在合并时触发发布，所以和版本号（如 2.0.1）一起改
 - **修复 `validate`（node-diff）检查**：它不安装依赖就加载 base 分支的 `__init__.py`，目前因顶层导入 numpy/PIL/requests/cryptography 而必定失败。办法是把这些依赖改为按需导入（已在 PR #2 留言说明）
 
 - 做一个 Comfy Cloud 同步工具：在节点外部运行，通过 Comfy Cloud API v2（`GET /api/v2/assets/{id}/content`）下载生成结果，再上传到网盘或保险库。注意结果有 `expires_at` 过期时间

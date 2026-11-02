@@ -3,7 +3,7 @@
 
   python auth.py google_drive  [--client-id ID --client-secret SECRET]
   python auth.py webdav        --url https://dav.example.com/ --username USER
-  python auth.py r2            --account-id ID --bucket BUCKET --access-key-id KEY  [--limit-gb 10]
+  python auth.py r2            --url https://<account>.r2.cloudflarestorage.com/<bucket>  [--limit-gb 10]
   python auth.py s3            --endpoint https://s3.us-east-1.amazonaws.com --region us-east-1 --bucket BUCKET
   python auth.py aliyundrive   --client-id ID --client-secret SECRET
   python auth.py vault-create  google_drive  --path ComfyUI-Vault  [--generate-password]
@@ -95,13 +95,17 @@ def auth_s3(args, store):
     env = cls.env_prefix
     values = {"public_url": args.public_url, "limit_gb": args.limit_gb}
     if args.cmd == "r2":
-        values["account_id"] = _ask("Cloudflare account ID (R2 page, right column): ",
-                                    args.account_id or os.environ.get(env + "ACCOUNT_ID"))
+        from cloud_drive.s3 import parse_r2_url
+        if args.account_id:
+            values["account_id"] = args.account_id
+        else:
+            # The bucket's "S3 API" URL carries both the account and the bucket name.
+            values.update(parse_r2_url(_ask("S3 API URL (bucket → Settings → S3 API): ", args.url)))
     else:
         values["endpoint"] = _ask("Endpoint URL (e.g. https://s3.us-east-1.amazonaws.com): ",
                                   args.endpoint or os.environ.get(env + "ENDPOINT"))
         values["region"] = args.region or os.environ.get(env + "REGION") or "us-east-1"
-    values["bucket"] = _ask("Bucket name: ", args.bucket or os.environ.get(env + "BUCKET"))
+    values["bucket"] = _ask("Bucket name: ", args.bucket or values.get("bucket") or os.environ.get(env + "BUCKET"))
     values["access_key_id"] = _ask("Access Key ID: ", args.access_key_id or os.environ.get(env + "ACCESS_KEY_ID"))
     values["secret_access_key"] = (os.environ.get(env + "SECRET_ACCESS_KEY")
                                    or getpass.getpass("Secret Access Key: ").strip())
@@ -206,7 +210,8 @@ def main():
         p = sub.add_parser(name, help="Connect Cloudflare R2 (10 GB free)" if r2 else
                            "Connect S3-compatible storage (AWS S3, Backblaze B2, MinIO, Wasabi...)")
         if r2:
-            p.add_argument("--account-id", help="Cloudflare account ID")
+            p.add_argument("--url", help="The bucket's S3 API URL, https://<account>.r2.cloudflarestorage.com/<bucket>")
+            p.add_argument("--account-id", help="Cloudflare account ID (instead of --url)")
         else:
             p.add_argument("--endpoint", help="S3 endpoint URL, e.g. https://s3.us-east-1.amazonaws.com")
             p.add_argument("--region", help="Region (default us-east-1)")

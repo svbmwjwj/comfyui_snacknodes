@@ -18,7 +18,7 @@ AUTH_COMMANDS = {
     "google_drive": "python custom_nodes/comfyui_snacknodes/auth.py google_drive",
     "webdav": "python custom_nodes/comfyui_snacknodes/auth.py webdav --url URL --username USER",
     "aliyundrive": "python custom_nodes/comfyui_snacknodes/auth.py aliyundrive",
-    "r2": "python custom_nodes/comfyui_snacknodes/auth.py r2 --account-id ID --bucket BUCKET",
+    "r2": "python custom_nodes/comfyui_snacknodes/auth.py r2 --url S3_API_URL",
     "s3": "python custom_nodes/comfyui_snacknodes/auth.py s3 --endpoint URL --bucket BUCKET",
 }
 KEY_PROVIDERS = ("r2", "s3")
@@ -27,25 +27,26 @@ KEY_PROVIDERS = ("r2", "s3")
 MESSAGES: dict[str, tuple[str, str, str, str]] = {
     "not_authorized": (
         "{provider} 尚未授权，或授权已失效。",
-        "在运行 ComfyUI 的机器的终端执行：{cmd}",
+        "在节点上选择 {provider}，按出现的面板重新连接；或在终端执行：{cmd}",
         "{provider} is not authorized, or the authorization has expired.",
-        "Run in a terminal on the ComfyUI machine: {cmd}"),
+        "Pick {provider} on the node and connect it in the panel that appears, or run: {cmd}"),
     "wrong_password": (
         "{provider} 用户名或密码错误。",
-        "重新执行：{cmd}。坚果云等服务要用「应用密码」，不是登录密码。",
+        "在节点的连接面板里重新填写（或执行：{cmd}）。坚果云等服务要用「应用密码」，不是登录密码。",
         "Wrong {provider} username or password.",
-        "Run again: {cmd}. Services such as Nutstore need an app password, not your login password."),
+        "Enter them again in the node's connect panel (or run: {cmd}). Services such as Nutstore need an "
+        "app password, not your login password."),
     "wrong_keys": (
         "{provider} 的 Access Key ID 或 Secret Access Key 错误，或密钥已被删除。",
-        "重新创建 API 令牌后执行：{cmd}",
+        "重新创建 API 令牌，在节点的连接面板里重新填写（或执行：{cmd}）",
         "Wrong {provider} Access Key ID or Secret Access Key, or the key was deleted.",
-        "Create a new API token, then run: {cmd}"),
+        "Create a new API token and enter it in the node's connect panel (or run: {cmd})"),
     "storage_limit": (
         "再上传就会超过你给 {provider} 设的容量上限（Cloudflare R2 免费额度为 10 GB）。",
-        "清理存储桶里的旧文件；或执行 {cmd} --limit-gb 新上限（设为 0 关闭检查，超出免费额度会产生费用）。",
+        "清理存储桶里的旧文件；或在节点的连接面板里修改容量上限（0 = 不限制，超出免费额度会产生费用）。",
         "This upload would take {provider} over the storage limit you set (R2's free tier is 10 GB).",
-        "Delete old files from the bucket, or run {cmd} --limit-gb NEW_LIMIT "
-        "(0 turns the check off; storage over the free tier is billed)."),
+        "Delete old files from the bucket, or change the limit in the node's connect panel "
+        "(0 = no limit; storage over the free tier is billed)."),
     "forbidden": (
         "没有权限写入这个网盘目录。",
         "检查「网盘目录」是否正确，以及账号是否有写入权限。",

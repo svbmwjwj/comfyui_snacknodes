@@ -13,7 +13,7 @@ from cloud_drive.errors import classify
 from cloud_drive.s3 import EMPTY_SHA256, R2, S3, StorageLimitReached, sign_v4
 from cloud_drive.vault import CryptomatorVault
 
-ACCOUNT = "abc123"
+ACCOUNT = "0123456789abcdef0123456789abcdef"
 ENDPOINT = f"https://{ACCOUNT}.r2.cloudflarestorage.com"
 BUCKET = "comfy"
 KEY_ID, SECRET = "AKID", "s3cr3t"
