@@ -1,6 +1,6 @@
 # 开发记录与测试计划
 
-最后更新：2026-11-02 · **2.1.0 开发中：R2、节点内连接网盘和设置保险库；Registry ID 改为 `SnackNodes`** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
+最后更新：2026-11-02 · **2.1.0 开发中：R2、节点内连接网盘和设置保险库、后台上传；Registry ID 改为 `SnackNodes`** · **2.0.0 已发布到 Comfy Registry；项目主页上线，Google 品牌已验证**
 
 ## 已完成
 
@@ -75,6 +75,16 @@
 
 本地是用 git 装的话，文件夹名不会变（标签仍是 `comfyui_snacknodes`），这是正常的；标签要等合并发布后从 Registry 装 `SnackNodes` 才会变。
 
+GitHub 仓库已改名为 `svbmwjwj/SnackNodes`：本地克隆先执行 `git remote set-url origin https://github.com/svbmwjwj/SnackNodes`（不改也能用，GitHub 会跳转）。
+
+后台上传要测的：
+- 连一个视频（或 file_paths 指向一个几百 MB 的文件），默认设置运行：工作流马上结束，节点上显示进度，完成后右上角提示
+- 上传中途关掉 ComfyUI 再启动：日志提示继续，R2 / Google Drive 从断点接着传
+- 断网几分钟：节点显示「⏸ 几点几分自动重试」，恢复后继续
+- 终端执行 `python custom_nodes/<文件夹>/auth.py uploads --wait`，看到进度，全部完成后返回 0
+- 打开「等待上传完成」：和以前一样，传完才继续，输出里有链接
+- 关闭「保留本地副本」：上传完成后 output 和 `user/snacknodes_pending/` 里都不留文件
+
 步骤：节点目录 `git pull` → 停掉旧 ComfyUI（`lsof -ti tcp:8188 | xargs kill`）→ `comfy launch` → 浏览器 `Cmd+Shift+R`。经典界面和 Nodes 2.0 各看一遍：
 1. 打开「加密」：下面出现保险库位置和两个按钮；点「新建保险库」→ 弹窗 → 选自动生成 → 存好密码 → 输入最后一组 → 创建，节点显示「🔒 保险库：ComfyUI-Vault（已就绪）」
 2. 跑一次上传，用 Cryptomator App 打开保险库核对
@@ -83,21 +93,25 @@
 5. 保存工作流、刷新再打开：其他控件的值不错位，JSON 里没有 `snack_` 开头的值，也没有密码
 6. 之前的连接控件检查项（R2/WebDAV 填写、切换网盘、Google 授权）
 
-### 计划：后台上传（2026-11-02 提出，方案待用户确认后再做）
+12. **后台上传（2026-11-02，用户确认：默认后台、加「等待上传完成」开关默认关、要 `uploads --wait`、断点续传和 R2 并行分片一起做）**：
+   - 原因：同步上传时大视频会让整个工作流队列停在这个节点。ComfyUI 的异步节点也一样要等返回，解决不了
+   - `cloud_drive/uploads.py`：持久化队列（`~/.config/comfyui_snacknodes/uploads.json`，原子写入）+ 后台线程（一次一个任务）+ 心跳线程（有任务时每 5 秒写一次）。任务状态 queued / running / waiting（临时失败，30 秒、2 分钟、10 分钟后自动重试，最多 3 次；只对网络、服务器出错、限流）/ failed / done（保留最近 50 个）。重启时 running → queued。进度事件节流 0.5 秒，进度落盘节流 3 秒。`snapshot()` 给前端的数据不含本地路径和续传状态
+   - 断点续传（provider 的 `upload_file(..., resume=dict)`，改动后调用 `save_resume()` 落盘）：
+     - Google Drive：保存 resumable session URL，重试时先 `PUT bytes */size` 问已收到多少再接着传；会话失效（404/410）就新建
+     - R2/S3：保存 UploadId、key 和已完成分片的 ETag，只补传缺的分片；保存的上传已不存在（404 NoSuchUpload）就从头开始一次。后台模式失败时不中止分片上传（R2 7 天后自动清理），取消任务时调用 `discard_resume` 中止
+     - 加密：保存密文临时文件和选定的文件名，重试时发送同一份密文（重新加密每次结果都不同，没法续传）；传完删除
+     - WebDAV：没有标准续传，从头传
+   - R2/S3 分片并行：`PARALLEL_PARTS = 4`（内存约 4×16 MB），进度按各分片已发送字节汇总。等待模式也会用到
+   - 节点：新选项「等待上传完成」（默认关）。后台模式下先检查设置（网盘已连接、开了加密就要有保险库），有问题照旧按「失败时停止」处理；然后入队立即返回：输出「上传结果」= 每个文件将要存放的位置，「成功」= 已入队。「保留本地副本」关闭时文件复制（优先硬链接）到 `ComfyUI/user/snacknodes_pending/<任务>/`，上传成功或取消后删除。「保留本地副本」的说明改为「关：上传完成后删除本地文件」
+   - 启动：`__init__.py` 在 ComfyUI 里启动队列，`notify` 用 `PromptServer.instance.send_sync("snacknodes.upload", …)` 广播；日志会提示「还有 N 个文件没传完，继续」
+   - 路由：`GET /snacknodes/uploads`、`POST /snacknodes/uploads/{id}/retry`、`POST /snacknodes/uploads/{id}/cancel`（运行中的任务不能取消，返回 409）
+   - 前端（`web/js/save_to_cloud_drive.js`）：节点结果区显示「⏳ 已加入上传队列」→「⬆ 后台上传中 15% · 1/3 · a.mp4 · 120.0/800.0 MB」→「✅ 已上传」；临时失败显示「⏸ 几点几分自动重试」；失败显示 ❌ 原因 + 原生按钮「重试上传」「取消（删除为上传保留的文件）」；完成和失败弹 toast。刷新网页后（`afterConfigureGraph`）会把没完成的任务重新显示到对应节点上（按节点 id 匹配）
+   - `auth.py uploads [--wait] [--timeout 秒]`：读队列文件；返回码 0 全部成功、1 有失败、2 还有没传完但 ComfyUI 没在运行（心跳超过 60 秒）、3 超时。AutoDL 用法：`python custom_nodes/SnackNodes/auth.py uploads --wait && shutdown`
+   - 测试：新增 `tests/test_uploads.py`（重启后继续、临时失败自动重试/永久失败手动重试、取消时删除临时文件并中止分片、心跳判断、并行分片、S3 只补传缺的分片、保存的上传失效时从头开始、Google 复用会话、加密续传发送同一份密文、`uploads --wait` 各种返回码、命令行、真实后台线程）和节点后台模式测试；`FakeS3` 改为每次生成不同的 UploadId，并对不存在的 UploadId 返回 404。前端用桩 app/api 在 Node.js 里跑了 排队→上传中→失败（按钮）→重试→完成 的显示。**还没在真实 ComfyUI 里测**
 
-问题：现在节点在工作流里同步上传，大视频要传很久，整个队列都卡在这个节点上。ComfyUI 的异步节点（`async def`）也一样要等它返回，换成异步节点解决不了。
+### 待用户确认：全局上传面板
 
-思路：**节点只负责把文件存到本地，上传交给 ComfyUI 进程里的后台队列**，工作流马上继续跑。
-1. 节点：存好文件 → 写一条上传任务（文件列表、网盘、目录、是否加密、来自哪个节点/哪次运行）到持久化队列 → 立刻返回。节点上显示「⏳ 已加入上传队列（3 个文件）」
-2. 后台线程（插件加载时启动，一次传一个任务）：按顺序上传，复用现有 provider、加密、进度回调和重试；用 `PromptServer.instance.send_sync("snacknodes.upload", …)` 推送进度、完成、失败（节流到约 1 次/秒）
-3. 前端：节点上的结果区实时显示「⬆ 2/3 · video.mp4 · 120/800 MB」，完成后变成 ✅ + 链接；失败时 ❌ + 原因 + 「重试」按钮；另外有全局提示（toast，加一个小的上传队列面板/角标），即使切换了工作流也能看到
-4. 持久化：队列存成 JSON（凭据目录旁边），ComfyUI 重启后继续。断点续传第二步再做：Google 存 resumable session URL，R2/S3 存 UploadId 和已传的分片；WebDAV 没有标准续传，从头传
-5. 「保留本地副本」关闭时：文件不能放 ComfyUI 的 temp（重启会清空），改放插件自己的待上传目录，传完删除
-6. 新增选项「等待上传完成」（默认关 = 后台上传）。需要在同一个工作流里用「上传结果 / 成功」输出做自动化的，打开它，行为和现在一样；「失败时停止」只在等待模式下有意义。后台模式下「成功」= 已加入队列，「上传结果」= 每个文件的目标位置（还没有分享链接）
-7. AutoDL 关机前要确认队列清空：节点/面板显示还有几个没传完；提供 `GET /snacknodes/uploads` 和 `auth.py uploads --wait`（等全部传完再退出，方便写进关机脚本）
-8. 顺带提速（可选）：R2/S3 分片并行上传（2–4 片同时传）
-
-待用户确认：默认是否后台上传；是否需要全局上传队列面板；是否要做 `uploads --wait`
+方案：用 ComfyUI 的侧边栏接口（`app.extensionManager.registerSidebarTab`）加一个「上传」标签页，图标上显示还没传完的数量（角标）。面板里按时间列出任务：网盘 / 目录、文件数、进度条、速度和剩余时间、状态；失败的有「重试」「取消」，完成的可以点链接（Google Drive / 公开 R2）或复制路径；顶部汇总「还剩 3 个文件 · 1.2 GB」和一个「清除已完成」。数据来自同一个 `/snacknodes/uploads` 和 `snacknodes.upload` 事件，所以切换工作流、节点被删掉也能看到。
 
 ## 已做过的需求决策
 
@@ -118,7 +132,7 @@
 
 ## 已验证
 
-- 103 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
+- 117 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
 - **ComfyUI 实机测试通过（2026-11-01）**：在云端临时环境里装了最新版 ComfyUI（提交 `6d35280`，2026-10-31；前端 1.57.6；CPU 模式）。节点加载无报错，显示名、分类、下拉选项都正确；通过 API 和网页"运行"按钮分别执行了"Empty Image → Save to Cloud Drive（WebDAV）"，状态 success，图片按日期变量传到了 WebDAV，本地副本按 `filename_prefix` 存进 `output/snack/`，节点下方显示预览图。截图流程见 Playwright 脚本（未入库）

@@ -10,6 +10,11 @@
   python auth.py vault-unlock  aliyundrive   --path ComfyUI-Vault
   python auth.py status
   python auth.py logout        google_drive
+  python auth.py uploads       [--wait] [--timeout SECONDS]
+
+`uploads --wait` waits until every background upload is done, e.g. before shutting down a rented
+GPU machine:  python custom_nodes/SnackNodes/auth.py uploads --wait && shutdown
+Exit codes: 0 all uploaded, 1 some failed, 2 uploads left but ComfyUI is not running, 3 timed out.
 
 Credentials go to ~/.config/comfyui_snacknodes/cloud_drive.json (mode 600), or to
 $SNACKNODES_CONFIG_DIR. They are never written into workflows.
@@ -192,6 +197,20 @@ def status(store):
     print(f"\nCredential file: {store.path}")
 
 
+def uploads(args) -> int:
+    from cloud_drive import uploads as up
+    if args.wait:
+        return up.wait_for_uploads(timeout=args.timeout)
+    data = up.read_queue()
+    lines = up.describe(data)
+    s = up.summarize(data)
+    print("\n".join(lines) if lines else "No uploads waiting.")
+    if s["active"] and not s["worker_alive"]:
+        print("ComfyUI is not running; these continue when it starts.")
+    print(f"\nQueue file: {up.queue_path()}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -231,6 +250,9 @@ def main():
             g.add_argument("--generate-password", action="store_true", help="Generate a strong password")
             g.add_argument("--own-password", action="store_true", help="Type your own password")
     sub.add_parser("status", help="Show what is configured")
+    p = sub.add_parser("uploads", help="Show background uploads; --wait blocks until they are done")
+    p.add_argument("--wait", action="store_true", help="Wait until every upload is done (exit code 0)")
+    p.add_argument("--timeout", type=float, default=0, help="Give up waiting after this many seconds (exit 3)")
     p = sub.add_parser("logout", help="Remove stored credentials and vault keys")
     p.add_argument("provider", choices=list(PROVIDERS))
     args = ap.parse_args()
@@ -249,6 +271,8 @@ def main():
             vault(args, store, create=args.cmd == "vault-create")
         elif args.cmd == "status":
             status(store)
+        elif args.cmd == "uploads":
+            sys.exit(uploads(args))
         elif args.cmd == "logout":
             store.clear(args.provider)
             store.clear(f"vault:{args.provider}")

@@ -77,6 +77,8 @@ class FakeS3(FakeSession):
             self.fail_puts -= 1
             return FakeResponse(503, content=b"<Error><Code>SlowDown</Code></Error>")
         if "uploadId" in q:
+            if q["uploadId"] not in self.uploads:
+                return FakeResponse(404, content=b"<Error><Code>NoSuchUpload</Code></Error>")
             self.uploads[q["uploadId"]][int(q["partNumber"])] = body
             return FakeResponse(200, content=b"", headers={"ETag": f'"etag{q["partNumber"]}"'})
         self.objects[key] = body
@@ -87,9 +89,12 @@ class FakeS3(FakeSession):
         if err:
             return err
         if "uploads" in q:
-            self.uploads["U1"] = {}
-            return FakeResponse(200, content=b"<InitiateMultipartUploadResult xmlns='x'>"
-                                             b"<UploadId>U1</UploadId></InitiateMultipartUploadResult>")
+            self.started = getattr(self, "started", 0) + 1
+            upload_id = f"U{self.started}"
+            self.uploads[upload_id] = {}
+            return FakeResponse(200, content=f"<InitiateMultipartUploadResult xmlns='x'>"
+                                             f"<UploadId>{upload_id}</UploadId></InitiateMultipartUploadResult>"
+                                             .encode())
         parts = self.uploads.pop(q["uploadId"])
         assert b"<PartNumber>1</PartNumber><ETag>\"etag1\"</ETag>" in self._body(kw)
         self.objects[key] = b"".join(parts[i] for i in sorted(parts))

@@ -21,8 +21,10 @@ import hmac
 import io
 import os
 import re
+import threading
 import time
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 from urllib.parse import quote, unquote, urlsplit
@@ -30,12 +32,13 @@ from urllib.parse import quote, unquote, urlsplit
 import requests
 
 from .base import (DEFAULT_TIMEOUT, RETRY_STATUS, AuthRequired, CloudDriveError, Progress, Provider,
-                   raise_after_retries)
+                   raise_after_retries, save_resume)
 from .config import CredentialStore
 from .paths import AUTH_SCRIPT
 
 GB = 1000 ** 3  # Cloudflare bills in decimal GB
 PART_SIZE = 16 * 1024 * 1024
+PARALLEL_PARTS = 4  # parts sent at the same time (memory: PARALLEL_PARTS x PART_SIZE)
 MULTIPART_THRESHOLD = 64 * 1024 * 1024
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 # S3 error codes that mean the keys themselves are wrong (HTTP 403, not a permission problem)
@@ -312,9 +315,13 @@ class S3(Provider):
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
                     allow_rename: bool = True,
-                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
+                    progress: Optional[Progress] = None,
+                    resume: Optional[dict[str, Any]] = None) -> tuple[str, str, Optional[str]]:
         final = name
-        if self._send("HEAD", _join(parent_id, name), ok=(200, 404)).status_code == 200:
+        if resume is not None and resume.get("key") and resume.get("upload_id") and \
+                os.path.dirname(resume["key"]) == parent_id.rstrip("/"):
+            final = os.path.basename(resume["key"])  # continue the interrupted upload under the same name
+        elif self._send("HEAD", _join(parent_id, name), ok=(200, 404)).status_code == 200:
             if not allow_rename:
                 raise CloudDriveError(f"{_join(parent_id, name)} already exists")
             stem, ext = os.path.splitext(name)
@@ -330,7 +337,7 @@ class S3(Provider):
                 body = f.read()
             self._send("PUT", key, body=body, headers=headers, progress=progress, total=size)
         else:
-            self._multipart(key, local_path, size, headers, progress)
+            self._multipart(key, local_path, size, headers, progress, resume)
         if self._used is not None:
             self._used += size
         public = self._creds().get("public_url")
@@ -338,35 +345,103 @@ class S3(Provider):
         return key, final, url
 
     def _multipart(self, key: str, local_path: str, size: int, headers: dict[str, str],
-                   progress: Optional[Progress]) -> None:
-        resp = self._send("POST", key, query={"uploads": ""}, headers=headers)
-        upload_id = _strip_ns(ET.fromstring(resp.content)).findtext("UploadId")
-        if not upload_id:
-            raise CloudDriveError(f"No UploadId in the reply: {resp.text[:300]}", body=resp.text[:2000])
-        etags: list[str] = []
-        try:
+                   progress: Optional[Progress], resume: Optional[dict[str, Any]] = None) -> None:
+        """Multipart upload, PARALLEL_PARTS parts at a time. With a resume dict the upload id and
+        finished parts are recorded as they complete, so an interrupted upload continues later
+        (R2 drops unfinished multipart uploads after 7 days); without one a failure aborts it."""
+        state = resume if resume is not None else {}
+        upload_id = state.get("upload_id") if state.get("key") == key and state.get("size") == size else None
+        etags: dict[int, str] = {int(n): e for n, e in (state.get("etags") or {}).items()} if upload_id else {}
+        resumed = upload_id is not None
+        if upload_id is None:
+            upload_id = self._start_multipart(key, headers)
+            etags = {}
+            if resume is not None:
+                resume.update(key=key, size=size, upload_id=upload_id, etags={})
+                save_resume(resume)
+        parts = [(i + 1, off, min(PART_SIZE, size - off)) for i, off in enumerate(range(0, size, PART_SIZE))]
+        lock = threading.Lock()
+        sent = {n: length for n, _, length in parts if n in etags}
+
+        def report() -> None:
+            if progress:
+                progress(min(sum(sent.values()), size), size)
+
+        def send_part(number: int, offset: int, length: int) -> None:
             with open(local_path, "rb") as f:
-                offset = 0
-                while offset < size:
-                    chunk = f.read(PART_SIZE)
-                    part = self._send("PUT", key, body=chunk, progress=progress, offset=offset, total=size,
-                                      query={"partNumber": str(len(etags) + 1), "uploadId": upload_id})
-                    etags.append(part.headers.get("ETag", ""))
-                    offset += len(chunk)
+                f.seek(offset)
+                chunk = f.read(length)
+
+            def on_part(done: int, _total: int) -> None:
+                with lock:
+                    sent[number] = done
+                    report()
+            resp = self._send("PUT", key, body=chunk, progress=on_part, total=length,
+                              query={"partNumber": str(number), "uploadId": upload_id})
+            with lock:
+                etags[number] = resp.headers.get("ETag", "")
+                sent[number] = length
+                if resume is not None:
+                    resume["etags"] = {str(n): e for n, e in etags.items()}
+                    save_resume(resume)
+
+        try:
+            todo = [p for p in parts if p[0] not in etags]
+            report()
+            try:
+                self._run_parts(send_part, todo)
+            except CloudDriveError as e:
+                if e.status != 404 or not resumed:
+                    raise
+                # The saved upload no longer exists (aborted or expired): start over once.
+                resume.clear()
+                return self._multipart(key, local_path, size, headers, progress, resume)
             xml = "<CompleteMultipartUpload>" + "".join(
-                f"<Part><PartNumber>{i}</PartNumber><ETag>{etag}</ETag></Part>"
-                for i, etag in enumerate(etags, 1)) + "</CompleteMultipartUpload>"
+                f"<Part><PartNumber>{n}</PartNumber><ETag>{etags[n]}</ETag></Part>"
+                for n, _, _ in parts) + "</CompleteMultipartUpload>"
             done = self._send("POST", key, query={"uploadId": upload_id}, body=xml.encode(),
                               headers={"Content-Type": "application/xml"})
             # S3 may answer 200 and still report an error in the body
             if b"<Error>" in done.content:
                 raise CloudDriveError(f"Completing the upload failed: {done.text[:300]}", body=done.text[:2000])
         except BaseException:
-            try:
-                self._send("DELETE", key, query={"uploadId": upload_id}, ok=(200, 204, 404), retries=1)
-            except Exception:  # noqa: BLE001 - best effort; the original error matters
-                pass
+            if resume is None:
+                self.abort_upload(key, upload_id)
             raise
+
+    def _start_multipart(self, key: str, headers: dict[str, str]) -> str:
+        resp = self._send("POST", key, query={"uploads": ""}, headers=headers)
+        upload_id = _strip_ns(ET.fromstring(resp.content)).findtext("UploadId")
+        if not upload_id:
+            raise CloudDriveError(f"No UploadId in the reply: {resp.text[:300]}", body=resp.text[:2000])
+        return upload_id
+
+    @staticmethod
+    def _run_parts(send_part: Callable[[int, int, int], None], todo: list[tuple[int, int, int]]) -> None:
+        if PARALLEL_PARTS <= 1 or len(todo) <= 1:
+            for part in todo:
+                send_part(*part)
+            return
+        with ThreadPoolExecutor(max_workers=PARALLEL_PARTS, thread_name_prefix="snack-s3-part") as pool:
+            futures = [pool.submit(send_part, *part) for part in todo]
+            try:
+                for future in as_completed(futures):
+                    future.result()
+            except BaseException:
+                for future in futures:
+                    future.cancel()
+                raise
+
+    def abort_upload(self, key: str, upload_id: str) -> None:
+        try:
+            self._send("DELETE", key, query={"uploadId": upload_id}, ok=(200, 204, 404), retries=1)
+        except Exception:  # noqa: BLE001 - best effort; the original error matters
+            pass
+
+    def discard_resume(self, resume: dict[str, Any]) -> None:
+        """Called when a queued upload is cancelled: free the parts stored for it."""
+        if resume.get("key") and resume.get("upload_id"):
+            self.abort_upload(resume["key"], resume["upload_id"])
 
 
 class R2(S3):

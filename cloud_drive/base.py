@@ -83,6 +83,13 @@ def request(
     raise_after_retries(f"{method} {url}", retries + 1, last_error)
 
 
+def save_resume(resume: Optional[dict[str, Any]]) -> None:
+    """Persist a resume dict (the upload queue gives it a save() method; plain dicts are ignored)."""
+    save = getattr(resume, "save", None)
+    if save:
+        save()
+
+
 def raise_after_retries(what: str, attempts: int, last_error: Optional[Exception]) -> None:
     """Final error after retrying, keeping the HTTP status or marking it as a network failure."""
     if isinstance(last_error, CloudDriveError):
@@ -118,10 +125,14 @@ class Provider:
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
                     allow_rename: bool = True,
-                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
+                    progress: Optional[Progress] = None,
+                    resume: Optional[dict[str, Any]] = None) -> tuple[str, str, Optional[str]]:
         """Upload; returns (file_id, final_name, share_url_or_None).
         allow_rename=False must fail rather than store under a different name.
-        progress, if given, is called with (bytes_sent, total_bytes) as the upload advances."""
+        progress, if given, is called with (bytes_sent, total_bytes) as the upload advances.
+        resume, if given, is a dict the provider may fill with what it needs to continue an
+        interrupted upload later (and reads back on the next try); call save_resume() after changing
+        it. Providers without resumable uploads ignore it and start over."""
         raise NotImplementedError
 
     def download(self, file_id: str) -> bytes:
@@ -155,9 +166,11 @@ class Provider:
         return current
 
     def upload(self, local_path: str, remote_folder: str, remote_name: Optional[str] = None,
-               mime_type: str = "application/octet-stream", progress: Optional[Progress] = None) -> UploadResult:
+               mime_type: str = "application/octet-stream", progress: Optional[Progress] = None,
+               resume: Optional[dict[str, Any]] = None) -> UploadResult:
         import os
         parent = self.ensure_folder(remote_folder)
+        kw = {"resume": resume} if resume is not None else {}
         file_id, final_name, url = self.upload_file(
-            parent, remote_name or os.path.basename(local_path), local_path, mime_type, progress=progress)
+            parent, remote_name or os.path.basename(local_path), local_path, mime_type, progress=progress, **kw)
         return UploadResult(self.name, "/".join(split_folder(remote_folder) + [final_name]), file_id, url)

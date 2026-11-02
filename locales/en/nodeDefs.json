@@ -21,7 +21,11 @@
       },
       "keep_local_copy": {
         "name": "keep_local_copy",
-        "tooltip": "On: also keep the files in ComfyUI's output folder. Off: use the temp folder (cleared when ComfyUI restarts)."
+        "tooltip": "On: also keep the files in ComfyUI's output folder. Off: the files are deleted once they are uploaded."
+      },
+      "wait_for_upload": {
+        "name": "wait_for_upload",
+        "tooltip": "Off (default): files upload in the background and the workflow goes on at once; progress shows on the node, and unfinished uploads continue after a restart. On: the workflow waits here until the upload is done, so the remote_paths / success outputs can be used for automation."
       },
       "filename_prefix": {
         "name": "filename_prefix",
@@ -29,7 +33,7 @@
       },
       "stop_on_error": {
         "name": "stop_on_error",
-        "tooltip": "On: a failed upload stops the workflow with an error. Off: the workflow continues and the success output is False (for automation)."
+        "tooltip": "On: a failed upload stops the workflow with an error. Off: the workflow continues and the success output is False (for automation). With background uploads this only applies to setup problems found before queueing (drive not connected, no vault)."
       },
       "images": {
         "name": "images",
@@ -47,11 +51,11 @@
     "outputs": {
       "0": {
         "name": "remote_paths",
-        "tooltip": "One line per uploaded file: a share link when the drive provides one, otherwise provider:path."
+        "tooltip": "One line per file. With wait_for_upload on: a share link when the drive provides one, otherwise provider:path. Off (background upload): where each file will be stored."
       },
       "1": {
         "name": "success",
-        "tooltip": "True when every file was uploaded. With stop_on_error off, a failed upload gives False instead of stopping the workflow, so you can branch on it."
+        "tooltip": "With wait_for_upload on: True when every file was uploaded (with stop_on_error off, a failed upload gives False instead of stopping the workflow). Off: True once the files are queued for upload."
       }
     }
   }

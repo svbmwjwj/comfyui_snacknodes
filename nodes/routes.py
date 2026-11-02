@@ -8,6 +8,9 @@ GET  /snacknodes/vault/{name}             whether this drive has a vault (locati
 POST /snacknodes/vault/{name}/create      JSON {path, password}: create a vault there and keep its keys
 POST /snacknodes/vault/{name}/unlock      JSON {path, password}: open an existing vault
 POST /snacknodes/vault/{name}/forget      forget the vault keys (the files on the drive stay)
+GET  /snacknodes/uploads                  background uploads: jobs (no local paths) and a summary
+POST /snacknodes/uploads/{id}/retry       retry a failed upload
+POST /snacknodes/uploads/{id}/cancel      forget an upload that is not running (its pending copies are deleted)
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ import logging
 from aiohttp import web
 
 from ..cloud_drive.connect import Connector
+from ..cloud_drive.uploads import get_queue
 
 logger = logging.getLogger(__name__)
 _connector = Connector()
@@ -55,7 +59,27 @@ async def _call(request: web.Request, action: str) -> web.Response:
         return web.json_response({"error": explain(name, e)}, status=400)
 
 
+async def _uploads(request: web.Request, action: str) -> web.Response:
+    queue = get_queue()
+    try:
+        if action == "list":
+            jobs = await _run(queue.jobs)
+            return web.json_response({"jobs": jobs, "summary": await _run(queue.summary)})
+        job_id = request.match_info["id"]
+        fn = queue.retry if action == "retry" else queue.cancel
+        return web.json_response({"job": await _run(fn, job_id)})
+    except KeyError:
+        return web.json_response({"error": {"zh": "找不到这个上传任务", "en": "Upload not found"}}, status=404)
+    except ValueError as e:
+        return web.json_response({"error": {"zh": "这个任务正在上传，请等它完成或失败后再操作。",
+                                            "en": "This upload is running; wait for it to finish or fail.",
+                                            "detail": str(e)}}, status=409)
+
+
 def register(routes: web.RouteTableDef) -> None:
+    routes.get("/snacknodes/uploads")(lambda r: _uploads(r, "list"))
+    for action in ("retry", "cancel"):
+        routes.post(f"/snacknodes/uploads/{{id}}/{action}")(lambda r, a=action: _uploads(r, a))
     routes.get("/snacknodes/drive/{name}")(lambda r: _call(r, "status"))
     for action in ("connect", "oauth", "disconnect"):
         routes.post(f"/snacknodes/drive/{{name}}/{action}")(lambda r, a=action: _call(r, a))

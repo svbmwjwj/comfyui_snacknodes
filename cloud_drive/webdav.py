@@ -146,7 +146,8 @@ class WebDAV(Provider):
     def upload_file(self, parent_id: str, name: str, local_path: str,
                     mime_type: str = "application/octet-stream",
                     allow_rename: bool = True,
-                    progress: Optional[Progress] = None) -> tuple[str, str, Optional[str]]:
+                    progress: Optional[Progress] = None,
+                    resume: Optional[dict[str, Any]] = None) -> tuple[str, str, Optional[str]]:
         final = name
         if self.find_child(parent_id, name):
             if not allow_rename:

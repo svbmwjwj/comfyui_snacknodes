@@ -7,6 +7,8 @@ import logging
 import mimetypes
 import os
 import re
+import shutil
+import uuid
 from datetime import datetime
 
 import numpy as np
@@ -15,6 +17,8 @@ from PIL.PngImagePlugin import PngInfo
 
 from ..cloud_drive import NODE_PROVIDERS, PROVIDERS, CloudDriveError  # noqa: F401 - re-exported for tests
 from ..cloud_drive.errors import explain, ui_locale
+from ..cloud_drive.base import split_folder
+from ..cloud_drive.uploads import get_queue
 from ..cloud_drive.vault import CryptomatorVault
 
 logger = logging.getLogger(__name__)
@@ -69,6 +73,14 @@ def _resolve_local_file(path: str) -> str:
     if not os.path.isfile(real):
         raise FileNotFoundError(f"File not found: {path}")
     return real
+
+
+def _pending_root() -> str:
+    """Where background uploads keep files that are not kept in output/ (inside ComfyUI's user folder)."""
+    folder_paths = _folder_paths()
+    base = folder_paths.get_user_directory() if hasattr(folder_paths, "get_user_directory") \
+        else os.path.dirname(folder_paths.get_output_directory())
+    return os.path.join(base, "snacknodes_pending")
 
 
 def _mb(n: int) -> str:
@@ -129,10 +141,11 @@ class SaveToCloudDrive:
     OUTPUT_NODE = True
     RETURN_TYPES = ("STRING", "BOOLEAN")
     RETURN_NAMES = ("remote_paths", "success")
-    OUTPUT_TOOLTIPS = ("One line per uploaded file: a share link when the drive provides one, "
-                       "otherwise provider:path.",
-                       "True when every file was uploaded. With stop_on_error off, a failed upload gives False "
-                       "instead of stopping the workflow, so you can branch on it.")
+    OUTPUT_TOOLTIPS = ("One line per file. With wait_for_upload on: a share link when the drive provides one, "
+                       "otherwise provider:path. Off (background upload): where each file will be stored.",
+                       "With wait_for_upload on: True when every file was uploaded (with stop_on_error off, a "
+                       "failed upload gives False instead of stopping the workflow). Off: True once the files "
+                       "are queued for upload.")
     # English texts live here; other languages in locales/<lang>/nodeDefs.json.
     DESCRIPTION = ("Upload images and videos to your own cloud drive (Google Drive, WebDAV, Cloudflare R2), "
                    "optionally end-to-end encrypted. Hover over each option for details.")
@@ -166,8 +179,15 @@ class SaveToCloudDrive:
                 }),
                 "keep_local_copy": ("BOOLEAN", {
                     "default": True,
-                    "tooltip": "On: also keep the files in ComfyUI's output folder. Off: use the temp folder "
-                               "(cleared when ComfyUI restarts).",
+                    "tooltip": "On: also keep the files in ComfyUI's output folder. Off: the files are deleted "
+                               "once they are uploaded.",
+                }),
+                "wait_for_upload": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Off (default): files upload in the background and the workflow goes on at "
+                               "once; progress shows on the node, and unfinished uploads continue after a "
+                               "restart. On: the workflow waits here until the upload is done, so the "
+                               "remote_paths / success outputs can be used for automation.",
                 }),
                 "filename_prefix": ("STRING", {
                     "default": "ComfyUI", "advanced": True,
@@ -177,7 +197,9 @@ class SaveToCloudDrive:
                 "stop_on_error": ("BOOLEAN", {
                     "default": True, "advanced": True,
                     "tooltip": "On: a failed upload stops the workflow with an error. Off: the workflow "
-                               "continues and the success output is False (for automation).",
+                               "continues and the success output is False (for automation). With background "
+                               "uploads this only applies to setup problems found before queueing (drive not "
+                               "connected, no vault).",
                 }),
             },
             "optional": {
@@ -194,8 +216,8 @@ class SaveToCloudDrive:
         }
 
     def save_and_upload(self, provider, remote_folder, encrypt=False, preview=False, keep_local_copy=True,
-                        filename_prefix="ComfyUI", stop_on_error=True, images=None, video=None, file_paths="",
-                        prompt=None, extra_pnginfo=None, unique_id=None):
+                        wait_for_upload=False, filename_prefix="ComfyUI", stop_on_error=True, images=None,
+                        video=None, file_paths="", prompt=None, extra_pnginfo=None, unique_id=None):
         provider_name = PROVIDER_LABELS.get(provider, provider)
         if provider_name not in PROVIDERS:
             raise ValueError(f"Unknown provider: {provider}")
@@ -215,12 +237,17 @@ class SaveToCloudDrive:
                 ui_images.append(entry)
         if video is not None:
             to_upload.append(self._save_video(video, filename_prefix, out_dir, prompt, extra_pnginfo))
+        saved = set(to_upload)  # written by this node (the rest are existing files from file_paths)
         for line in (file_paths or "").splitlines():
             if line.strip():
                 to_upload.append(_resolve_local_file(line.strip()))
 
         if not to_upload:
             raise ValueError("Nothing to upload: connect images or video, or fill in file_paths.")
+
+        if not wait_for_upload:
+            return self._queue_upload(provider, provider_name, remote_folder, encrypt, keep_local_copy,
+                                      stop_on_error, to_upload, saved, preview, ui_images, unique_id)
 
         results: list[str] = []
         failure = None
@@ -255,6 +282,52 @@ class SaveToCloudDrive:
         if preview and ui_images:
             ui["images"] = ui_images
         return {"ui": ui, "result": (text, failure is None)}
+
+    @staticmethod
+    def _queue_upload(label, provider_name, remote_folder, encrypt, keep_local_copy, stop_on_error, to_upload,
+                      saved, preview, ui_images, unique_id):
+        """Background mode: check the setup now (so mistakes show at once), then queue the files."""
+        try:
+            client = PROVIDERS[provider_name]()
+            if not client.is_authorized():
+                from ..cloud_drive.base import AuthRequired
+                raise AuthRequired(f"{label} is not connected")
+            if encrypt:
+                CryptomatorVault.load(client)
+        except Exception as e:  # noqa: BLE001 - explained like an upload failure
+            failure = explain(e, provider_name, label)
+            if stop_on_error:
+                raise RuntimeError(f"{failure.text(ui_locale())}\n\n{failure.detail}") from e
+            ui = {"text": [""], "upload_ok": [False], "upload_total": [len(to_upload)],
+                  "upload_error": [{"code": failure.code, "zh": failure.zh, "en": failure.en,
+                                    "detail": failure.detail}]}
+            return {"ui": ui, "result": ("", False)}
+
+        files = [{"path": p, "cleanup": False} for p in to_upload]
+        pending_dir = None
+        if not keep_local_copy:
+            # ComfyUI empties its temp folder on restart: keep our own copy until it is uploaded.
+            pending_dir = os.path.join(_pending_root(), uuid.uuid4().hex[:12])
+            os.makedirs(pending_dir, exist_ok=True)
+            files = []
+            for path in to_upload:
+                if path not in saved:
+                    files.append({"path": path, "cleanup": False})
+                    continue
+                copy = os.path.join(pending_dir, os.path.basename(path))
+                try:
+                    os.link(path, copy)
+                except OSError:
+                    shutil.copy2(path, copy)
+                files.append({"path": copy, "cleanup": True})
+        job = get_queue().add(provider=provider_name, provider_label=label, remote_folder=remote_folder,
+                              encrypt=encrypt, files=files, node_id=unique_id, pending_dir=pending_dir)
+        lines = [f"{provider_name}:" + "/".join(split_folder(remote_folder) + [f["name"]]) for f in job["files"]]
+        text = "\n".join(lines)
+        ui = {"text": [text], "upload_job": [job], "upload_total": [len(lines)]}
+        if preview and ui_images:
+            ui["images"] = ui_images
+        return {"ui": ui, "result": (text, True)}
 
     @staticmethod
     def _save_images(images, filename_prefix, out_dir, save_type, prompt, extra_pnginfo):
