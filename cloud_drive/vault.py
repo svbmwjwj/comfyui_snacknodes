@@ -18,7 +18,8 @@ class VaultNotConfigured(CloudDriveError):
     """Encryption is on but no vault was created/unlocked for this drive."""
 
 
-AUTH_HINT = "Run: python custom_nodes/comfyui_snacknodes/auth.py vault-create (or vault-unlock)"
+AUTH_HINT = ("Set it up below encrypt on the node, or run: "
+             "python custom_nodes/comfyui_snacknodes/auth.py vault-create (or vault-unlock)")
 
 
 def _store_key(provider_name: str) -> str:

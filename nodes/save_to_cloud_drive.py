@@ -138,8 +138,8 @@ class SaveToCloudDrive:
 
 One-time setup: pick the drive, and the node shows what to fill in (Google Drive: a
 Connect button). Credentials are stored on the ComfyUI machine, never in the workflow.
-Encryption: create the vault once in a terminal on that machine:
-  python custom_nodes/comfyui_snacknodes/auth.py vault-create r2
+Encryption: turn on encrypt, then create or open a vault in the rows below it
+(once per drive; the password is never stored).
 
 Usage
 - Connect images and/or video; pick the drive.
@@ -148,7 +148,7 @@ Usage
   ComfyUI/%year%/%month%     ->  ComfyUI/2026/11
 - encrypt: file contents and names are encrypted before upload (Cryptomator vault);
   open them with the Cryptomator app.
-- preview: show the images on the node after the run.
+- preview: show the images on the node after the run (off by default).
 - keep_local_copy: also keep the files in ComfyUI's output folder.
 - Advanced: filename_prefix (local file names); stop_on_error off = keep going and
   output success = False instead of stopping the workflow.
@@ -177,10 +177,10 @@ Existing files are never overwritten (name_1, name_2 ...)."""
                 "encrypt": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Encrypt file contents and names before upload (Cryptomator vault format); open "
-                               "them with the Cryptomator app. Create the vault once with auth.py vault-create.",
+                               "them with the Cryptomator app. Set up the vault in the rows that appear below.",
                 }),
                 "preview": ("BOOLEAN", {
-                    "default": True,
+                    "default": False,
                     "tooltip": "Show the saved images on the node after the run.",
                 }),
                 "keep_local_copy": ("BOOLEAN", {
@@ -212,7 +212,7 @@ Existing files are never overwritten (name_1, name_2 ...)."""
             "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO", "unique_id": "UNIQUE_ID"},
         }
 
-    def save_and_upload(self, provider, remote_folder, encrypt=False, preview=True, keep_local_copy=True,
+    def save_and_upload(self, provider, remote_folder, encrypt=False, preview=False, keep_local_copy=True,
                         filename_prefix="ComfyUI", stop_on_error=True, images=None, video=None, file_paths="",
                         prompt=None, extra_pnginfo=None, unique_id=None):
         provider_name = PROVIDER_LABELS.get(provider, provider)

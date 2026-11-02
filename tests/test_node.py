@@ -81,7 +81,12 @@ def test_plain_upload(node_module):
     lines = res["result"][0].splitlines()
     assert lines == ["local:ComfyUI/x/pic_00001_.png", "local:ComfyUI/x/pic_00002_.png"]
     assert (drive / "ComfyUI" / "x" / "pic_00001_.png").read_bytes() == (out / "pic_00001_.png").read_bytes()
-    assert len(res["ui"]["images"]) == 2
+    assert "images" not in res["ui"]  # preview is off by default
+
+
+def test_preview_default_off(node_module):
+    spec = node_module[0].SaveToCloudDrive.INPUT_TYPES()["required"]["preview"]
+    assert spec[1]["default"] is False
 
 
 def test_encrypted_upload(node_module, tmp_path):

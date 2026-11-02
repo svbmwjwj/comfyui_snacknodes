@@ -126,3 +126,45 @@ def test_google_device_flow_in_background(tmp_path, monkeypatch):
     status = c.status("google_drive")
     assert status["connected"] and status["oauth"]["state"] == "done"
     assert mod.FORMS["google_drive"]["kind"] == "oauth"
+
+
+def _connected_dav(c):
+    c.connect("webdav", {"url": BASE, "username": "me", "password": "app-pw"})
+
+
+def test_vault_needs_a_connected_drive(env):
+    _, _, c = env
+    assert c.vault_status("webdav") == {"provider": "webdav", "connected": False, "vault": None,
+                                        "default_path": "ComfyUI-Vault", "min_password": 8}
+    with pytest.raises(Exception) as e:
+        c.vault_create("webdav", {"path": "V", "password": "long enough"})
+    assert c.vault_error("webdav", e.value)["zh"] == "请先在上面连接网盘。"
+
+
+def test_vault_create_unlock_forget(env):
+    store, _, c = env
+    _connected_dav(c)
+    with pytest.raises(Exception) as e:
+        c.vault_create("webdav", {"path": "V", "password": "short"})
+    assert "至少 8 个字符" in c.vault_error("webdav", e.value)["zh"]
+
+    out = c.vault_create("webdav", {"path": "/My Vault/", "password": "correct horse"})
+    assert out["vault"] == {"path": "My Vault"}
+    saved = store.get("vault:webdav")
+    assert saved["path"] == "My Vault" and saved["enc_key"]
+    assert "correct horse" not in json.dumps(store.get("vault:webdav")) + json.dumps(out)
+
+    with pytest.raises(Exception) as e:
+        c.vault_create("webdav", {"path": "My Vault", "password": "correct horse"})
+    assert "已经有一个保险库" in c.vault_error("webdav", e.value)["zh"]
+
+    assert c.vault_forget("webdav")["vault"] is None and store.get("vault:webdav") == {}
+    with pytest.raises(Exception) as e:
+        c.vault_unlock("webdav", {"path": "My Vault", "password": "wrong password"})
+    assert c.vault_error("webdav", e.value)["zh"] == "保险库密码错误。"
+    with pytest.raises(Exception) as e:
+        c.vault_unlock("webdav", {"path": "Nope", "password": "correct horse"})
+    assert c.vault_error("webdav", e.value)["zh"].startswith("这个位置没有保险库")
+
+    out = c.vault_unlock("webdav", {"path": "My Vault", "password": "correct horse"})
+    assert out["vault"] == {"path": "My Vault"} and store.get("vault:webdav")["enc_key"] == saved["enc_key"]

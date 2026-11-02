@@ -90,9 +90,11 @@ MESSAGES: dict[str, tuple[str, str, str, str]] = {
         "Check the network. If you need a proxy, set HTTPS_PROXY and restart ComfyUI."),
     "vault_not_configured": (
         "已开启加密，但这个网盘还没有设置保险库。",
-        "在终端执行：python custom_nodes/comfyui_snacknodes/auth.py vault-create {name}",
+        "在节点「加密」下面出现的几行里新建或打开保险库；或在终端执行：python custom_nodes/comfyui_snacknodes/auth.py "
+        "vault-create {name}",
         "Encryption is on, but no vault is set up for this drive.",
-        "Run in a terminal: python custom_nodes/comfyui_snacknodes/auth.py vault-create {name}"),
+        "Create or open a vault in the rows below encrypt on the node, or run: "
+        "python custom_nodes/comfyui_snacknodes/auth.py vault-create {name}"),
     "local_file": (
         "本地文件不存在或无法读取。",
         "检查「额外上传文件」里的路径（相对于 ComfyUI 的 output 目录）。",

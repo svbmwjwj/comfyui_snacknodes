@@ -254,8 +254,8 @@ python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID 
 | 图像 / 视频 | — | 要上传的图片和/或视频 |
 | 网盘 | Google Drive | 上传到哪个存储。没连接过的网盘，选中后下拉框下面会出现几行连接设置 |
 | 网盘目录 | `ComfyUI/%date:yyyy-MM-dd%` | 按日期自动分文件夹，见[日期变量](#-网盘目录与日期变量) |
-| 加密 | 关 | 用 Cryptomator 保险库格式端到端加密，见[加密](#-端到端加密) |
-| 预览 | 开 | 运行后在节点上显示图片 |
+| 加密 | 关 | 用 Cryptomator 保险库格式端到端加密。打开后下面会出现保险库设置，见[加密](#-端到端加密) |
+| 预览 | 关 | 运行后在节点上显示图片 |
 | 保留本地副本 | 开 | 关掉则只放在临时目录 |
 | 文件名前缀 *(高级)* | `ComfyUI` | 本地副本的文件名，可带子目录 |
 | 失败时停止 *(高级)* | 开 | 关掉后上传失败不中断工作流，而是让「成功」输出 false |
@@ -297,23 +297,26 @@ python custom_nodes/comfyui_snacknodes/auth.py aliyundrive --client-id 你的ID 
 
 这就是 Cryptomator 的保险库格式（vault format 8），可以用 **Cryptomator 官方客户端**直接打开，不依赖本工具。兼容性已用 Cryptomator 官方 Java 库 `cryptofs` 双向验证，CI 每次都会重跑。
 
-**第一步：创建保险库**（每个网盘一次，目前需要在终端里执行）
+**在节点上打开「加密」**，下面会出现保险库设置（每个网盘设置一次）：
+
+- **保险库位置**：网盘上的文件夹，默认 `ComfyUI-Vault`
+- **新建保险库（设置密码）**：弹出窗口里选择 **自己设置密码**（至少 8 位，输入两次），或 **自动生成强密码**（6 组共约 148 位强度，不含 0/O、1/l 这类易混字符，需输入最后一组确认已保存）
+- **打开已有保险库（输入密码）**：已经有用 Cryptomator App 创建的保险库（WebDAV、R2/S3、阿里云盘）？输入位置和密码，节点会往里面继续写入
+
+设置好后节点上显示「🔒 保险库：位置」，之后上传的文件都会进入保险库。「网盘目录」是保险库**里面**的目录。
+
+> ⚠️ **密码是恢复文件的唯一方式。** 没有找回、重置或恢复密钥，请立即存进密码管理器。本工具不保存密码，只在本机保存解锁后的密钥；密码不会写进工作流。
+
+<details>
+<summary>终端方式（效果相同）</summary>
 
 ```bash
 python custom_nodes/comfyui_snacknodes/auth.py vault-create r2 --path ComfyUI-Vault
-```
-
-可以选择 **自己输入密码**（至少 8 位），或 **自动生成强密码**（6 组共约 148 位强度，不含 0/O、1/l 这类易混字符，需输入最后一组确认已保存）。也可以加 `--own-password` / `--generate-password` 跳过选择。
-
-已经有用 Cryptomator App 创建的保险库（WebDAV、R2/S3、阿里云盘）？用 `vault-unlock` 解锁后，节点会往里面继续写入：
-
-```bash
 python custom_nodes/comfyui_snacknodes/auth.py vault-unlock webdav --path 我的保险库
 ```
 
-> ⚠️ **密码是恢复文件的唯一方式。** 没有找回、重置或恢复密钥，请立即存进密码管理器。本工具不保存密码，只在本机保存解锁后的密钥。
-
-**第二步：在节点上打开「加密」**，之后上传的文件都会进入保险库。
+`vault-create` 可加 `--own-password` / `--generate-password` 跳过选择。
+</details>
 
 <details>
 <summary><b>如何用 Cryptomator 打开</b></summary>

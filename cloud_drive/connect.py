@@ -17,10 +17,14 @@ from .base import CloudDriveError
 from .config import CredentialStore
 from .errors import explain
 from .google_drive import GoogleDrive, resolve_client
+from .cryptomator import VaultError
 from .s3 import GB, R2, parse_r2_url
+from .vault import CryptomatorVault
 from .webdav import WebDAV, is_insecure_url
 
 README = "https://github.com/svbmwjwj/comfyui_snacknodes#-授权"
+DEFAULT_VAULT = "ComfyUI-Vault"
+MIN_VAULT_PASSWORD = 8
 
 
 def _field(key: str, zh: str, en: str, *, secret: bool = False, placeholder: str = "", default: str = "",
@@ -178,3 +182,67 @@ class Connector:
 
         threading.Thread(target=wait, daemon=True, name="snack-google-auth").start()
         return self.status(name)
+
+    # ---- vault (encryption): created or unlocked from the node; only the unlocked keys are stored
+    def vault_status(self, name: str) -> dict[str, Any]:
+        provider = self._provider(name)
+        data = self.store.get(f"vault:{name}")
+        vault = {"path": data.get("path", "")} if data.get("enc_key") else None
+        return {"provider": name, "connected": provider.is_authorized(), "vault": vault,
+                "default_path": DEFAULT_VAULT, "min_password": MIN_VAULT_PASSWORD}
+
+    def _vault_args(self, name: str, values: dict[str, Any]):
+        provider = self._provider(name)
+        if not provider.is_authorized():
+            raise CloudDriveError(f"{getattr(provider, 'display_name', name)} is not connected yet")
+        path = "/".join(p for p in str((values or {}).get("path") or DEFAULT_VAULT).strip().split("/") if p)
+        password = str((values or {}).get("password") or "")
+        if not path:
+            raise CloudDriveError("Empty vault location")
+        return provider, path, password
+
+    def vault_create(self, name: str, values: dict[str, Any]) -> dict[str, Any]:
+        provider, path, password = self._vault_args(name, values)
+        if len(password) < MIN_VAULT_PASSWORD:
+            raise VaultInputError("short_password")
+        CryptomatorVault.create(provider, path, password).save(self.store)
+        return self.vault_status(name)
+
+    def vault_unlock(self, name: str, values: dict[str, Any]) -> dict[str, Any]:
+        provider, path, password = self._vault_args(name, values)
+        if not password:
+            raise VaultInputError("short_password")
+        CryptomatorVault.unlock(provider, path, password).save(self.store)
+        return self.vault_status(name)
+
+    def vault_forget(self, name: str) -> dict[str, Any]:
+        self._provider(name)
+        self.store.clear(f"vault:{name}")
+        return self.vault_status(name)
+
+    def vault_error(self, name: str, exc: BaseException) -> dict[str, Any]:
+        detail = str(exc)
+        if isinstance(exc, VaultInputError):
+            return {"zh": f"保险库密码至少 {MIN_VAULT_PASSWORD} 个字符。",
+                    "en": f"Use at least {MIN_VAULT_PASSWORD} characters for the vault password.", "detail": ""}
+        if isinstance(exc, VaultError) and "Wrong vault password" in detail:
+            return {"zh": "保险库密码错误。", "en": "Wrong vault password.", "detail": ""}
+        if "already exists" in detail:
+            return {"zh": "这个位置已经有一个保险库了：请改用「打开已有保险库」，或换一个位置。",
+                    "en": "There is already a vault here: use Open existing vault, or pick another location.",
+                    "detail": detail}
+        if "No Cryptomator vault found" in detail:
+            google = name == "google_drive"
+            return {"zh": "这个位置没有保险库。" + ("Google Drive 上只能打开本工具创建的保险库。" if google
+                                                   else "请检查位置（区分大小写）。"),
+                    "en": "No vault at this location." + (" On Google Drive only vaults created by this tool "
+                                                          "can be opened." if google else
+                                                          " Check the location (it is case-sensitive)."),
+                    "detail": detail}
+        if "is not connected yet" in detail:
+            return {"zh": "请先在上面连接网盘。", "en": "Connect the drive above first.", "detail": ""}
+        return self.error(name, exc)
+
+
+class VaultInputError(CloudDriveError):
+    """The vault password typed in the node is too short (or empty)."""
