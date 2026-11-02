@@ -189,6 +189,16 @@ class UploadQueue:
         self._emit("cancelled", job, force=True)
         return self.snapshot(job)
 
+    def clear_finished(self) -> int:
+        """Remove finished jobs from the list (the uploaded files are not touched)."""
+        with self.lock:
+            before = len(self.data["jobs"])
+            self.data["jobs"] = [j for j in self.data["jobs"] if j["state"] != "done"]
+            removed = before - len(self.data["jobs"])
+            if removed:
+                self._save()
+        return removed
+
     def start(self) -> None:
         if self.thread and self.thread.is_alive():
             return

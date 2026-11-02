@@ -319,3 +319,15 @@ def test_worker_thread_uploads_in_the_background(tmp_path):
     finally:
         q.stop()
     assert sorted(os.listdir(drive / "out")) == ["a.png", "b.png"] and events[:2] == ["queued", "running"]
+
+
+def test_clear_finished_keeps_unfinished_jobs(tmp_path):
+    drive = tmp_path / "drive"
+    drive.mkdir()
+    q = _queue(tmp_path, Flaky(drive))
+    _add(q, _files(tmp_path, "a.png"))
+    q.run_once()
+    q.providers["local"]().fail = 0
+    pending = _add(q, _files(tmp_path, "b.png"))
+    assert q.clear_finished() == 1 and [j["id"] for j in q.jobs()] == [pending["id"]]
+    assert up.read_queue(tmp_path / "q.json")["jobs"][0]["id"] == pending["id"]

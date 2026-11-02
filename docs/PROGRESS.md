@@ -84,6 +84,7 @@ GitHub 仓库已改名为 `svbmwjwj/SnackNodes`：本地克隆先执行 `git rem
 - 终端执行 `python custom_nodes/<文件夹>/auth.py uploads --wait`，看到进度，全部完成后返回 0
 - 打开「等待上传完成」：和以前一样，传完才继续，输出里有链接
 - 关闭「保留本地副本」：上传完成后 output 和 `user/snacknodes_pending/` 里都不留文件
+- 左侧边栏「上传」面板：角标数字、进度/速度、失败后重试和取消、清除已完成、浅色主题下是否看得清
 
 步骤：节点目录 `git pull` → 停掉旧 ComfyUI（`lsof -ti tcp:8188 | xargs kill`）→ `comfy launch` → 浏览器 `Cmd+Shift+R`。经典界面和 Nodes 2.0 各看一遍：
 1. 打开「加密」：下面出现保险库位置和两个按钮；点「新建保险库」→ 弹窗 → 选自动生成 → 存好密码 → 输入最后一组 → 创建，节点显示「🔒 保险库：ComfyUI-Vault（已就绪）」
@@ -109,9 +110,12 @@ GitHub 仓库已改名为 `svbmwjwj/SnackNodes`：本地克隆先执行 `git rem
    - `auth.py uploads [--wait] [--timeout 秒]`：读队列文件；返回码 0 全部成功、1 有失败、2 还有没传完但 ComfyUI 没在运行（心跳超过 60 秒）、3 超时。AutoDL 用法：`python custom_nodes/SnackNodes/auth.py uploads --wait && shutdown`
    - 测试：新增 `tests/test_uploads.py`（重启后继续、临时失败自动重试/永久失败手动重试、取消时删除临时文件并中止分片、心跳判断、并行分片、S3 只补传缺的分片、保存的上传失效时从头开始、Google 复用会话、加密续传发送同一份密文、`uploads --wait` 各种返回码、命令行、真实后台线程）和节点后台模式测试；`FakeS3` 改为每次生成不同的 UploadId，并对不存在的 UploadId 返回 404。前端用桩 app/api 在 Node.js 里跑了 排队→上传中→失败（按钮）→重试→完成 的显示。**还没在真实 ComfyUI 里测**
 
-### 待用户确认：全局上传面板
-
-方案：用 ComfyUI 的侧边栏接口（`app.extensionManager.registerSidebarTab`）加一个「上传」标签页，图标上显示还没传完的数量（角标）。面板里按时间列出任务：网盘 / 目录、文件数、进度条、速度和剩余时间、状态；失败的有「重试」「取消」，完成的可以点链接（Google Drive / 公开 R2）或复制路径；顶部汇总「还剩 3 个文件 · 1.2 GB」和一个「清除已完成」。数据来自同一个 `/snacknodes/uploads` 和 `snacknodes.upload` 事件，所以切换工作流、节点被删掉也能看到。
+13. **全局上传面板（2026-11-02，用户同意方案）**：`web/js/upload_panel.js`
+   - 用 `app.extensionManager.registerSidebarTab` 加左侧边栏标签「上传」（`pi pi-cloud-upload` 图标，`type: "custom"`，每次打开调用 `render(el)`，关闭调用 `destroy`）
+   - 图标角标 = 还没传完的文件数；没有进行中但有失败的显示「!」。1.57 的 `SidebarIcon` 用 computed 读 `iconBadge`，函数形式读不到我们的数据变化，所以改为直接修改侧边栏 store 里登记的 tab 对象的 `iconBadge`（它是响应式的）
+   - 面板：顶部汇总「还剩 N 个文件 · 大小 · 速度 · 约多久」+「清除已完成」；后台没在运行时提示。每个任务一张卡片：网盘 / 目录（加密带 🔒）、状态（排队中 / 上传中 / 等待重试 / 失败 / 已完成）、进度条、文件数和字节数、速度和剩余时间（前端按最近 15 秒的进度事件估算）、正在传的文件、错误原因；失败的有「重试」「取消」，排队或等待重试的可以「取消」，完成的列出每个文件，可「打开」链接（Google Drive / 设了公开地址的 R2）或「复制」路径
+   - 数据：`GET /snacknodes/uploads` + `snacknodes.upload` 事件；断线重连（`reconnected`）后重新拉取。新增 `POST /snacknodes/uploads/clear`（`UploadQueue.clear_finished`，只清列表，不动网盘上的文件）
+   - 验证：Playwright + 桩 app/api 渲染了三种状态的任务并截图核对，角标、速度/剩余时间、重试和清除的请求都正确；新增 `clear_finished` 测试，`pytest` 118 个通过。**还没在真实 ComfyUI 里看过**（侧边栏的图标、角标、浅色主题下的颜色需要用户实测确认）
 
 ## 已做过的需求决策
 
@@ -132,7 +136,7 @@ GitHub 仓库已改名为 `svbmwjwj/SnackNodes`：本地克隆先执行 `git rem
 
 ## 已验证
 
-- 117 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
+- 118 个自动化测试全部通过（`pytest`，含 cryptofs 互通测试和 WebDAV 单元测试），`ruff check .` 无报错
 - 用 Cryptomator 官方 Java 库 `cryptofs` 做了双向互通测试：本工具写的保险库，官方能逐字节正确解密；官方建的保险库，本工具能解锁并继续写入。这项测试已加入 CI
 - 阿里云盘的上传类接口，已对照 OpenList 的 `aliyundrive_open` 驱动源码核对过
 - **ComfyUI 实机测试通过（2026-11-01）**：在云端临时环境里装了最新版 ComfyUI（提交 `6d35280`，2026-10-31；前端 1.57.6；CPU 模式）。节点加载无报错，显示名、分类、下拉选项都正确；通过 API 和网页"运行"按钮分别执行了"Empty Image → Save to Cloud Drive（WebDAV）"，状态 success，图片按日期变量传到了 WebDAV，本地副本按 `filename_prefix` 存进 `output/snack/`，节点下方显示预览图。截图流程见 Playwright 脚本（未入库）

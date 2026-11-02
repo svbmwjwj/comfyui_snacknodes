@@ -11,6 +11,7 @@ POST /snacknodes/vault/{name}/forget      forget the vault keys (the files on th
 GET  /snacknodes/uploads                  background uploads: jobs (no local paths) and a summary
 POST /snacknodes/uploads/{id}/retry       retry a failed upload
 POST /snacknodes/uploads/{id}/cancel      forget an upload that is not running (its pending copies are deleted)
+POST /snacknodes/uploads/clear            remove finished uploads from the list
 """
 
 from __future__ import annotations
@@ -65,6 +66,8 @@ async def _uploads(request: web.Request, action: str) -> web.Response:
         if action == "list":
             jobs = await _run(queue.jobs)
             return web.json_response({"jobs": jobs, "summary": await _run(queue.summary)})
+        if action == "clear":
+            return web.json_response({"removed": await _run(queue.clear_finished)})
         job_id = request.match_info["id"]
         fn = queue.retry if action == "retry" else queue.cancel
         return web.json_response({"job": await _run(fn, job_id)})
@@ -78,6 +81,7 @@ async def _uploads(request: web.Request, action: str) -> web.Response:
 
 def register(routes: web.RouteTableDef) -> None:
     routes.get("/snacknodes/uploads")(lambda r: _uploads(r, "list"))
+    routes.post("/snacknodes/uploads/clear")(lambda r: _uploads(r, "clear"))
     for action in ("retry", "cancel"):
         routes.post(f"/snacknodes/uploads/{{id}}/{action}")(lambda r, a=action: _uploads(r, a))
     routes.get("/snacknodes/drive/{name}")(lambda r: _call(r, "status"))
