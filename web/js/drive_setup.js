@@ -62,6 +62,11 @@ async function call(provider, action, body) {
   });
   let data = {};
   try { data = await resp.json(); } catch { /* not JSON */ }
+  if (resp.status === 404 && !data.error) {
+    // The page has the new panel but the server is still running older Python code.
+    throw { zh: "ComfyUI 后端还没加载新版本的 SnackNodes：请完全重启 ComfyUI 后再刷新网页。如果重启后仍然这样，请查看启动日志里 SnackNodes 的报错。",
+            en: "The ComfyUI server has not loaded the new SnackNodes yet: fully restart ComfyUI, then reload the page. If it persists, check the startup log for SnackNodes errors." };
+  }
   if (!resp.ok) throw data.error || { zh: `请求失败（HTTP ${resp.status}）`, en: `Request failed (HTTP ${resp.status})` };
   return data;
 }
