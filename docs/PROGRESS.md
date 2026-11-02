@@ -33,6 +33,30 @@
 6. **只在节点里显示实测过的网盘**：下拉框只有 Google Drive、WebDAV、Cloudflare R2（`NODE_PROVIDERS`）。通用 S3 和阿里云盘代码保留，`auth.py` 仍可用，README 移到「实验性支持（待实测）」。注意：2.0.0 的工作流里如果选了 Aliyun Drive，打开后需要重新选择网盘
 7. **显示名**：`DisplayName` 改为 `SnackNodes`。Registry 节点 ID `comfyui_snacknodes` 发布后不可修改（官方文档：name "Immutable after creation"；最佳实践是名称里不带 ComfyUI，但只是建议），所以 ID 不变
 
+8. **用户本地实测反馈（2026-11-02，ComfyUI 0.43.2，前端 1.57.4，macOS，`comfy launch`，路径 `/Users/yuono/Developer/comfyui`）**：
+   - 之前的 404：旧 ComfyUI 进程占着 8188 端口，新进程没起来。已加启动日志 `SnackNodes: drive setup routes ready` 和 404 时的中文提示（提交 `a0165b5`）。关掉旧进程后，R2 显示「✓ 已连接」，后端正常
+   - **用户不满意的地方 1：连接面板的样式**。现在是 HTML 面板（`web/js/drive_setup.js`，DOM 小部件），而且节点被撑得很高、按钮被截断。用户要的是：选了某个网盘后，**直接在「网盘」下拉框下面展开几行原生控件**，样子和「网盘目录」那一行一样
+   - **用户不满意的地方 2：节点上方的标签仍显示 `comfyui_snacknodes`**。查了前端源码（`getNodeSource` / `shortenNodeName`）：这个标签取自插件**文件夹名**（`custom_nodes/<文件夹>`），只会去掉大小写完全匹配的 `ComfyUI-`/`ComfyUI_`/`Comfy-`/`Comfy_` 前缀；`pyproject.toml` 的 `DisplayName` 只影响 Registry 和 Manager 的列表。从 Registry 安装时文件夹名就是节点 ID `comfyui_snacknodes`（不可改），所以**我们改不了这个标签**。用户自己可以在设置里关掉节点来源标签。如果一定要改，只能换一个新的 Registry ID（之前讨论过的代价：老用户收不到更新）。**这一点要先跟用户确认怎么处理**
+
+### 下一步：把连接面板改成原生控件（新对话从这里开始）
+
+已确认的前端行为（读的是 `comfyui_frontend_package` 1.57 的打包代码）：
+- `serialiseWidgetValues` 会跳过 `widget.serialize === false` 的控件，并且同时保存 `widgets_values_named`（按名字）；生成 API prompt 时跳过 `options.serialize === false`。所以在「网盘」下面插入不保存的控件，不会打乱其他控件的值
+- 但 `addCustomWidget` 推入后会按位置尝试恢复值：新加的控件要**立刻**设 `serialize = false` 并重置 value
+- 前端源码里插入控件到中间位置是用 `node.widgets.splice(...)`，有的地方随后调用 `syncNodeWidgetOrder(node)`；需要在经典界面和 Nodes 2.0（Vue）界面都验证插入后能正常显示和刷新
+- 前端支持原生的 `COMFY_DYNAMICCOMBO`（选项切换时展开子输入），但子输入是正常输入，**值会存进工作流**，密钥会泄露，所以不能直接用；凭据控件必须是前端自己加、`serialize: false` 的
+
+计划：
+1. 去掉 HTML 面板（DOM 小部件），改为在 provider 控件后面插入原生控件（`node.addWidget` 后 splice 到 provider 后面）：
+   - R2：文本控件「S3 API 地址」「访问密钥 ID」「机密访问密钥」「容量上限（GB）」+ 按钮「连接」；提示放到控件 tooltip
+   - WebDAV：「WebDAV 地址」「用户名」「密码」+「连接」
+   - Google Drive：按钮「连接 Google Drive」；授权中显示按钮「打开 https://www.google.com/device」和「验证码 XXXX-XXXX（点击复制）」，每 3 秒刷新状态
+   - 已连接：一行按钮「✓ 已连接：存储桶 xxx，上限 10 GB」，加「修改连接」「断开连接」
+   - 出错用 ComfyUI 的 toast（`app.extensionManager.toast.add`），节点上留一行简短状态
+   - 连接成功后清空密码/机密控件（原生文本控件不会遮盖密码，只在输入时可见）
+2. 后端 `cloud_drive/connect.py`、`nodes/routes.py` 不用改
+3. 测试：沙箱不允许运行外部下载的 ComfyUI，只能请用户在本地测（经典界面 + Nodes 2.0），步骤：节点目录 `git pull` → 停掉旧 ComfyUI（`lsof -ti tcp:8188 | xargs kill`）→ `comfy launch` → 浏览器 `Cmd+Shift+R`
+
 ## 已做过的需求决策
 
 - （2026-11-01 补充）`remote_folder` 支持日期变量（`%date:yyyy-MM%` 等），可以按日期自动归档
