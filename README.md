@@ -75,7 +75,7 @@ pip install -r snacknodes/requirements.txt
 
 三种方式装好后，插件文件夹都是 `custom_nodes/snacknodes`，下文的终端命令都按这个路径写。节点上方的来源标签统一显示 **SnackNodes**。
 
-> 🔁 **从 2.0.0 升级**：2.1.0 起 Registry 节点 ID 从 `comfyui_snacknodes` 改为 `snacknodes`（Manager 里显示为 SnackNodes），旧 ID 不再更新。请在 Manager 里卸载 `comfyui_snacknodes`，再安装 SnackNodes（不要两个同时装）。已连接的网盘和保险库保存在 `~/.config/comfyui_snacknodes/`，换装后**不用重新连接**；工作流也不用改。
+> 🔁 **从 2.0.0 升级**：2.0.1 起 Registry 节点 ID 从 `comfyui_snacknodes` 改为 `snacknodes`（Manager 里显示为 SnackNodes），旧 ID 不再更新。请在 Manager 里卸载 `comfyui_snacknodes`，再安装 SnackNodes（不要两个同时装）。已连接的网盘和保险库保存在 `~/.config/comfyui_snacknodes/`，换装后**不用重新连接**；工作流也不用改。
 
 **② 添加节点并连接网盘**：添加 **保存到网盘** 节点（搜索「网盘」「上传」「upload」都能找到），在「网盘」里选一个。还没连接过的话，节点上会显示「⚠ 未连接 · 点此连接」，点它打开顶部 **SnackNodes** 按钮的「网盘设置」，填好点「连接」即可，**不用开终端**。
 
